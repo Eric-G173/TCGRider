@@ -1,5 +1,0 @@
-C:\Users\theip\OneDrive\Documents\PROJECT MIDNIGHT RIDER\windows-service-csharp\obj\Debug\net10.0\windows-service-csharp.csproj.AssemblyReference.cache
-C:\Users\theip\OneDrive\Documents\PROJECT MIDNIGHT RIDER\windows-service-csharp\obj\Debug\net10.0\windows-service-csharp.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\theip\OneDrive\Documents\PROJECT MIDNIGHT RIDER\windows-service-csharp\obj\Debug\net10.0\windows-service-csharp.AssemblyInfoInputs.cache
-C:\Users\theip\OneDrive\Documents\PROJECT MIDNIGHT RIDER\windows-service-csharp\obj\Debug\net10.0\windows-service-csharp.AssemblyInfo.cs
-C:\Users\theip\OneDrive\Documents\PROJECT MIDNIGHT RIDER\windows-service-csharp\obj\Debug\net10.0\windows-service-csharp.csproj.CoreCompileInputs.cache

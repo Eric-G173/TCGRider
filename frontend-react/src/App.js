@@ -1,6 +1,11 @@
 import logo from './logo.svg';
 import './App.css';
 
+function MyButton() {
+  return (
+    <button>I'm a button</button>
+  );
+}
 function App() {
   return (
     <div className="App">
@@ -16,6 +21,7 @@ function App() {
           rel="noopener noreferrer"
         >
           Learn Bleh
+          <MyButton />
         </a>
       </header>
     </div>
