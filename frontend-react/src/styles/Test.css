@@ -1,38 +1,70 @@
 .App {
-  text-align: center;
+  background-color: rgb(25, 25, 27);
+   min-height: 100vh
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.logo {
+  height: 3.0rem;
+  width: auto;
+  filter: brightness(0) invert(1);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.AppName { 
+  color: white;
+  margin-top: 1.25rem;
 }
 
 .App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+  display: flex; /*This turns into flex container, which means elements in the row line up side by side, default (no flex) is vertical (top to bottom)*/
+  align-items: center; /*This modifies the alignment given the display. Since its flex display (horizontal), it centers vertically*/
+  gap: 0.5rem; /* This will place a gap between each element inside the header */
+  background-color: rgb(40, 40, 42);
+  width: 100%;
+  -webkit-app-region: drag; /* makes header draggable */
+}
+
+.App-header button,
+.App-header input {
+  -webkit-app-region: no-drag;
+}
+
+
+.window-controls button {
+  -webkit-app-region: no-drag;
+  width: 46px;
+  height: 32px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  background: transparent;
+  border: none;
   color: white;
+  font-size: 14px;
+  cursor: pointer;
+
+  /* Focus visible for keyboard navigation */
+  outline: none;
 }
 
-.App-link {
-  color: #61dafb;
+.window-controls button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.window-controls button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.window-controls {
+  margin-left: auto;
+  display: flex;
+}
+.window-controls .close:hover {
+  background-color: rgb(237, 66, 69); /* red on hover, like native Windows */
+}
+
+.maximize-icon {
+  width: 9.5px;
+  height: 10px;
+  border: 1.5px solid white;
 }
