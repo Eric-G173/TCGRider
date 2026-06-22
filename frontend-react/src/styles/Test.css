@@ -1,6 +1,9 @@
 .App {
   background-color: rgb(25, 25, 27);
-   min-height: 100vh
+   display: flex;
+  flex-direction: column;
+   height: 100vh;            /* fixed, not min-height */
+  overflow: hidden;     
 }
 
 .logo {
@@ -18,8 +21,9 @@
   display: flex; /*This turns into flex container, which means elements in the row line up side by side, default (no flex) is vertical (top to bottom)*/
   align-items: center; /*This modifies the alignment given the display. Since its flex display (horizontal), it centers vertically*/
   gap: 0.5rem; /* This will place a gap between each element inside the header */
-  background-color: rgb(40, 40, 42);
+  background-color: rgba(40, 40, 42, 0.185);
   width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   -webkit-app-region: drag; /* makes header draggable */
 }
 
@@ -67,4 +71,82 @@
   width: 9.5px;
   height: 10px;
   border: 1.5px solid white;
+}
+
+.App-footer {
+  position: absolute;        /* floats instead of pushing App-body up */
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 64px;
+  padding: 0 0.75rem;
+  background-color: rgb(40, 40, 42);
+  border-radius: 12px;
+  width: 200px; 
+  -webkit-app-region: drag;
+}
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 2.0rem;
+}
+
+.icon-btn {
+  -webkit-app-region: no-drag;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background-color: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  padding: 0;
+}
+
+.icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.icon-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.notif-dot {
+  position: absolute;
+  top: 4px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: rgb(237, 66, 69);
+  border: 1.5px solid rgb(40, 40, 42);
+}
+
+.App-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;       /* prevents flex children from overflowing/collapsing */
+  overflow: hidden;
+}
+
+.App-sidebar {
+  width: 280px;
+  height: 100%;
+  border-right: 2px solid rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.App-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 90px;     /* keeps content from hiding behind the floating footer */
 }
