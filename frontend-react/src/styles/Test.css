@@ -210,3 +210,92 @@ justify-content: center;
 .new-btn:hover {
    background-color: var(--tracker-btn-hover);
 }
+
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.header-search {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-white);
+  font-size: 13px;
+  padding: 4px 10px;
+  width: 200px;
+  -webkit-app-region: no-drag;
+  outline: none;
+}
+
+.header-search::placeholder {
+  color: var(--app-white-muted);
+}
+
+.header-search:focus {
+  border-color: var(--app-border-bright);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.new-btn-active {
+  background-color: var(--app-surface-hover);
+  border-color: var(--app-border-bright);
+}
+
+.tracker-view {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  height: 100%;
+}
+
+.tracker-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 4px;
+}
+
+.tracker-title {
+  color: var(--app-white);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.tracker-progress {
+  color: var(--app-white);
+  font-size: 13px;
+  margin: 0;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.card-item {
+  aspect-ratio: 2/3;
+  background-color: var(--app-surface);
+  border-radius: var(--app-radius-sm);
+  border: 1px solid var(--app-border);
+  cursor: pointer;
+}
+
+.card-item:hover {
+  border-color: var(--app-border-bright);
+}
+
+.tracker-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--app-white);
+  font-size: 14px;
+}

@@ -1,5 +1,3 @@
-/.venv
-
 node_modules/
 
 bin/
@@ -8,3 +6,4 @@ obj/
 
 .env
 
+DatabaseLoader.cs

@@ -15,7 +15,7 @@
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
-    "concurrently": "^8.0.0",
+    "concurrently": "^8.2.2",
     "electron": "^42.4.0",
     "electron-builder": "^26.15.2",
     "wait-on": "^7.0.0"
