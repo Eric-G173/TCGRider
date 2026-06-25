@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 
+//dotnet run this in 1 terminal to get backend going. Once done, open new terminal and run  Invoke-WebRequest -Uri http://localhost:5000/api/sync/sv3pt5 -Method POST      
+//Can go to http://localhost:5000/api/cards/sv3pt5 and see results
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>

@@ -29,25 +29,33 @@ function App() {
   const { ipcRenderer } = window.require('electron');
   const [search, setSearch] = React.useState('');
   const [selectedTracker, setSelectedTracker] = React.useState(null);
+  const [cards, setCards] = React.useState([]);
+  const [loadingCards, setLoadingCards] = React.useState(false);
 
   const trackers = [
-    { name: "lucario!!", completed: 47, total: 165 },
-    { name: "pokemans", completed: 12, total: 102 },
-    { name: "da one piece", completed: 0, total: 204 },
+    { name: "Pokémon 151", setId: "sv3pt5", completed: 0, total: 165 },
+    { name: "Prismatic Evolution", setId: "sv8pt5", completed: 0, total: 193 },
   ];
 
   const filteredTrackers = trackers.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const [backendStatus, setBackendStatus] = React.useState('checking...');
+  React.useEffect(() => {
+    if (selectedTracker === null) return;
 
-React.useEffect(() => {
-    fetch('http://localhost:5000/ping')
-        .then(res => res.json())
-        .then(data => setBackendStatus(data.message))
-        .catch(() => setBackendStatus('backend offline'));
-}, []); // empty array means this runs once when app loads
+    const tracker = trackers[selectedTracker];
+    setLoadingCards(true);
+    setCards([]);
+
+    fetch(`http://localhost:5000/api/cards/${tracker.setId}`)
+      .then(res => res.json())
+      .then(data => {
+        setCards(data);
+        setLoadingCards(false);
+      })
+      .catch(() => setLoadingCards(false));
+  }, [selectedTracker]);
 
   return (
     <div className="App">
@@ -72,7 +80,7 @@ React.useEffect(() => {
           <button className="btn-close" onClick={() => ipcRenderer.send('window-close')}>✕</button>
         </div>
       </header>
-<p style={{ color: 'white', fontSize: 12 }}>{backendStatus}</p>
+
       <div className="App-body">
         <aside className="App-sidebar">
           <button className="new-tracker">
@@ -94,23 +102,35 @@ React.useEffect(() => {
           {selectedTracker !== null ? (
             <div className="tracker-view">
               <div className="tracker-header">
-  <h2 className="tracker-title">
-    {trackers[selectedTracker].name}
-  </h2>
-  <p className="tracker-progress">
-    {trackers[selectedTracker].completed} / {trackers[selectedTracker].total} cards collected
-  </p>
-</div>
-              <div className="card-grid">
-  {Array.from({ length: 30 }).map((_, i) => (
-    <div className="card-item" key={i}>
-      <div className="card-number">#{i + 1}</div>
-      <div className="card-img-placeholder" />
-      <div className="card-name">Card Name</div>
-      <button className="card-collect-btn">Collected</button>
-    </div>
-  ))}
-</div>
+                <h2 className="tracker-title">
+                  {trackers[selectedTracker].name}
+                </h2>
+                <p className="tracker-progress">
+                  {trackers[selectedTracker].completed} / {trackers[selectedTracker].total} cards collected
+                </p>
+              </div>
+
+              {loadingCards ? (
+                <div className="tracker-empty">
+                  <p>Loading cards...</p>
+                </div>
+              ) : (
+                <div className="card-grid">
+                  {cards.map((card, i) => (
+                    <div className="card-item" key={i}>
+                      <div className="card-number">#{i + 1}</div>
+                      <img
+                        className="card-img"
+                        src={card.imageUrl}
+                        alt={card.name}
+                        loading="lazy"
+                      />
+                      <div className="card-name">{card.name}</div>
+                      <button className="card-collect-btn">Collect</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="tracker-empty">
