@@ -4,6 +4,7 @@
   font-family: 'Inter', sans-serif;
 }
 
+
 :root {
 --app-shell: rgb(40, 40, 42); /*header and footer */
 --app-bg: rgb(25, 25, 27);
@@ -53,6 +54,7 @@
 .App-header input {
   -webkit-app-region: no-drag;
 }
+
 
 
 .window-controls button {
@@ -157,9 +159,10 @@
 
 .App-content {
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-bottom: 90px;     /* keeps content from hiding behind the floating footer */
+  min-height: 0;        /* same fix needed here */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .new-tracker {
@@ -273,10 +276,15 @@ justify-content: center;
 }
 
 .card-grid {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
-  overflow-y: auto;
+  gap: 120px;
+  overflow-y: auto;     /* only scroll vertically */
+  overflow-x: hidden;   /* kill horizontal scrollbar */
+  padding-bottom: 90px;
+  padding: 16px 120px 90px 16px;
 }
 
 .card-item {
