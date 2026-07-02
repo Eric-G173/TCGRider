@@ -24,13 +24,30 @@ function AppName() {
     <p className="AppName">TCGRider</p>
   )
 }
-
+{/**/}
 function App() {
-  const { ipcRenderer } = window.require('electron');
+    {/* the consts are react state variables. */}
+  const { ipcRenderer } = window.require('electron'); {/*This connects to the electron.js file*/}
   const [search, setSearch] = React.useState('');
   const [selectedTracker, setSelectedTracker] = React.useState(null);
   const [cards, setCards] = React.useState([]);
   const [loadingCards, setLoadingCards] = React.useState(false);
+
+  const [collectedCards, setCollectedCards] = React.useState(new Set());
+
+function toggleCollected(cardId) {
+    setCollectedCards(prev => {
+        const updated = new Set(prev);
+        if (updated.has(cardId)) {
+            updated.delete(cardId);
+        } else {
+            updated.add(cardId);
+        }
+        return updated;
+    });
+}
+
+const [selectedCard, setSelectedCard] = React.useState(null);
 
   const trackers = [
     { name: "Pokémon 151", setId: "sv3pt5", completed: 0, total: 165 },
@@ -105,6 +122,7 @@ function App() {
                 <h2 className="tracker-title">
                   {trackers[selectedTracker].name}
                 </h2>
+                
                 <p className="tracker-progress">
                   {trackers[selectedTracker].completed} / {trackers[selectedTracker].total} cards collected
                 </p>
@@ -116,19 +134,35 @@ function App() {
                 </div>
               ) : (
                 <div className="card-grid">
-                  {cards.map((card, i) => (
-                    <div className="card-item" key={i}>
-                      <div className="card-number">#{i + 1}</div>
-                      <img
-                        className="card-img"
-                        src={card.imageUrl}
-                        alt={card.name}
-                        loading="lazy"
-                      />
-                      <div className="card-name">{card.name}</div>
-                      <button className="card-collect-btn">Collect</button>
-                    </div>
-                  ))}
+                 {cards.map((card, i) => {
+  const isCollected = collectedCards.has(card.imageUrl);
+
+  return (
+    <div
+      className={`card-item ${isCollected ? 'collected' : ''}`}
+      key={i}
+      onClick={() => setSelectedCard(card)}
+    >
+      <div className="card-name">{card.name}</div>
+      <img
+        className="card-img"
+        src={card.imageUrl}
+        alt={card.name}
+        loading="lazy"
+      />
+      <div className="card-name" data-rarity={card.rarity}>{card.rarity}</div>
+      <button
+        className={`card-collect-btn ${isCollected ? 'card-collect-btn-yes' : 'card-collect-btn-no'}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleCollected(card.imageUrl);
+        }}
+      >
+        {isCollected ? '✓ Collected' : 'Collect'}
+      </button>
+    </div>
+  );
+})}
                 </div>
               )}
             </div>
@@ -137,6 +171,27 @@ function App() {
               <p>Select a tracker to view cards</p>
             </div>
           )}
+          {selectedCard && (
+    <div className="card-modal-overlay" onClick={() => setSelectedCard(null)}>
+        <div className="card-modal" onClick={(e) => e.stopPropagation()}>
+            <img
+                className="card-modal-img"
+                src={selectedCard.imageUrl}
+                alt={selectedCard.name}
+            />
+            <div className="card-modal-info">
+                <div className="card-modal-name">{selectedCard.name}</div>
+                <div className="card-modal-rarity">{selectedCard.rarity}</div>
+            </div>
+            <button
+                className="card-modal-close"
+                onClick={() => setSelectedCard(null)}
+            >
+                ✕
+            </button>
+        </div>
+    </div>
+)}
         </main>
       </div>
 
