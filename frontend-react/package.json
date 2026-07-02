@@ -20,14 +20,15 @@
     "electron-builder": "^26.15.2",
     "wait-on": "^7.0.0"
   },
-  "scripts": {
+ "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron": "electron .",
-    "dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\""
-  },
+    "server": "dotnet watch --project ../C#-backend run",
+    "dev": "concurrently -n REACT,ELECTRON,DOTNET -c blue,magenta,green \"npm start\" \"wait-on http://localhost:3000 && electron .\" \"npm run server\""
+},
   "eslintConfig": {
     "extends": [
       "react-app",
