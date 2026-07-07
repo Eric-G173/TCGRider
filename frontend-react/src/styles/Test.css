@@ -209,6 +209,7 @@
   font-size: 13px;
   padding: 4px 10px; /* shorthand: top/bottom right/left */
   width: 200px;
+  margin-left: 15rem;
   -webkit-app-region: no-drag;
   outline: none;
 }
@@ -308,6 +309,41 @@
    FOOTER ICON BUTTONS (profile etc)
 ───────────────────────────────────────── */
 
+.card-grid::-webkit-scrollbar {
+  width: 12px;
+}
+
+.card-grid::-webkit-scrollbar-track {
+  background: var(--app-bg);
+}
+
+.card-grid::-webkit-scrollbar-thumb {
+  background-color: var(--app-surface-hover);
+  border-radius: 12px;
+  border: 2px solid var(--app-bg);
+}
+
+.card-grid::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.App-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.App-sidebar::-webkit-scrollbar-track {
+  background: var(--app-bg);
+}
+
+.App-sidebar::-webkit-scrollbar-thumb {
+  background-color: var(--app-surface-hover);
+  border-radius: 8px;
+}
+
+.App-sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
 .footer-left {
   display: flex;
   align-items: center;
@@ -361,7 +397,7 @@
      overflow: hidden clips anything that would overflow */
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: 8px 16px;
   height: 100%;
 }
 
@@ -371,7 +407,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
   gap: 4px;
 }
 
@@ -416,25 +452,18 @@
      - auto-fill: fit as many columns as possible
      - minmax(120px, 1fr): each column is minimum 120px, maximum 1 fraction of available space
      - Result: responsive grid that reflows automatically when window resizes */
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 120px;       /* space between grid cells (both row and column gap) */
-  overflow-y: auto; /* only the card grid scrolls, not the whole page */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 50px;       /* space between grid cells (both row and column gap) */
+  overflow-y:auto; /* only the card grid scrolls, not the whole page */
   overflow-x: hidden;
-  padding: 5px 120px 200px 16px;
+  padding: 5px 120px 24px 16px;
   /* padding: top right bottom left
      200px bottom clears the floating footer + Windows taskbar
      120px right stops cards from touching the scrollbar */
 }
 
 .card-item {
-  /* Individual card container
-     aspect-ratio: 2/3 maintains TCG card proportions regardless of card width
-     This means if the card is 120px wide, it'll be 180px tall automatically */
   aspect-ratio: 2/3;
-  background-color: var(--app-surface);
-  border-radius: var(--app-radius-sm);
-  border: 1px solid var(--app-border);
-  cursor: pointer;
   color: var(--app-white);
   display: flex;
   flex-direction: column;
@@ -451,10 +480,12 @@
   /* The actual card image
      width: 125% intentionally overflows slightly for a fuller look
      object-fit: contain scales the image to fit without cropping or stretching */
-  width: 125%;
+    height:100%;
+  width: 100%;
   flex: 1;          /* takes up all remaining vertical space in the card */
   object-fit: contain;
   border-radius: 3px;
+    cursor: pointer;
 }
 
 .card-name {
@@ -489,7 +520,7 @@
   width: 100%;
   padding: 2px;
   border-radius: 4px;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -564,6 +595,7 @@
     opacity: 1;
   }
 }
+
 
 .card-modal-img {
   /* Large centered card image
@@ -646,7 +678,58 @@ card-container {
   cursor: default;
 }
 
-.card-item.collected {
+
+.card-img-wrap.collected {
   border-color: #ffd700;
   box-shadow: 0 0 12px 4px rgba(255, 215, 0, 0.5);
+}
+
+
+.card-modal-img-wrap {
+  border: 3px solid transparent; /* was 3px */
+}
+
+
+.card-modal-img {
+  max-height: 70vh;
+  width: auto;
+  display: block;
+  /* remove border-radius from here — the wrapper handles it now */
+}
+
+.card-img-wrap {
+  width: fit-content;
+  height: fit-content;
+  flex: 1;
+  border-radius: 14px;
+  border: 3px solid transparent;
+  overflow: hidden;
+  display: flex;
+}
+
+.card-search {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-white);
+  font-size: 13px;
+  padding: 4px 10px;
+  width: 200px;
+  outline: none;
+}
+
+.card-search::placeholder {
+  color: var(--app-white-muted);
+}
+
+.card-search:focus {
+  border-color: var(--app-border-bright);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.card-track-center {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 20px;
 }

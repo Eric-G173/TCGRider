@@ -29,6 +29,7 @@ function App() {
     {/* the consts are react state variables. */}
   const { ipcRenderer } = window.require('electron'); {/*This connects to the electron.js file*/}
   const [search, setSearch] = React.useState('');
+  const [cardSearch, setCardSearch] = React.useState('');
   const [selectedTracker, setSelectedTracker] = React.useState(null);
   const [cards, setCards] = React.useState([]);
   const [loadingCards, setLoadingCards] = React.useState(false);
@@ -58,6 +59,10 @@ const [selectedCard, setSelectedCard] = React.useState(null);
     t.name.toLowerCase().includes(search.toLowerCase())
   );
 
+    const filteredCards = cards.filter(card =>
+    card.name.toLowerCase().includes(cardSearch.toLowerCase())
+  );
+const collectedCount = cards.filter(card => collectedCards.has(card.imageUrl)).length;
   React.useEffect(() => {
     if (selectedTracker === null) return;
 
@@ -117,52 +122,66 @@ const [selectedCard, setSelectedCard] = React.useState(null);
 
         <main className="App-content">
           {selectedTracker !== null ? (
+            
             <div className="tracker-view">
+              
               <div className="tracker-header">
                 <h2 className="tracker-title">
                   {trackers[selectedTracker].name}
                 </h2>
                 
                 <p className="tracker-progress">
-                  {trackers[selectedTracker].completed} / {trackers[selectedTracker].total} cards collected
+                 {collectedCount} / {trackers[selectedTracker].total} cards collected
                 </p>
               </div>
-
+<div className="card-track-center">
+          <input
+            className="card-search"
+            type="text"
+            placeholder="Search Card..."
+            value={cardSearch}
+            onChange={(e) => setCardSearch(e.target.value)}
+          />
+        </div>
               {loadingCards ? (
                 <div className="tracker-empty">
                   <p>Loading cards...</p>
                 </div>
               ) : (
                 <div className="card-grid">
-                 {cards.map((card, i) => {
+                  {filteredCards.map((card, i) => {
   const isCollected = collectedCards.has(card.imageUrl);
 
   return (
-    <div
-      className={`card-item ${isCollected ? 'collected' : ''}`}
-      key={i}
-      onClick={() => setSelectedCard(card)}
-    >
-      <div className="card-name">{card.name}</div>
-      <img
-        className="card-img"
-        src={card.imageUrl}
-        alt={card.name}
-        loading="lazy"
-      />
-      <div className="card-name" data-rarity={card.rarity}>{card.rarity}</div>
-      <button
-        className={`card-collect-btn ${isCollected ? 'card-collect-btn-yes' : 'card-collect-btn-no'}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          toggleCollected(card.imageUrl);
-        }}
-      >
-        {isCollected ? '✓ Collected' : 'Collect'}
-      </button>
-    </div>
+   <div className="card-item" key={i}>
+  <div className="card-name">{card.name}</div>
+
+  <div
+    className={`card-img-wrap ${isCollected ? 'collected' : ''}`}
+    onClick={() => setSelectedCard(card)}
+  >
+    <img
+      className="card-img"
+      src={card.imageUrl}
+      alt={card.name}
+      loading="lazy"
+    />
+  </div>
+
+  <div className="card-name" data-rarity={card.rarity}>{card.rarity}</div>
+  <button
+    className={`card-collect-btn ${isCollected ? 'card-collect-btn-yes' : 'card-collect-btn-no'}`}
+    onClick={(e) => {
+      e.stopPropagation();
+      toggleCollected(card.imageUrl);
+    }}
+  >
+    {isCollected ? '✓ Collected' : 'Collect'}
+  </button>
+</div>
   );
 })}
+
                 </div>
               )}
             </div>
@@ -173,23 +192,21 @@ const [selectedCard, setSelectedCard] = React.useState(null);
           )}
           {selectedCard && (
     <div className="card-modal-overlay" onClick={() => setSelectedCard(null)}>
-        <div className="card-modal" onClick={(e) => e.stopPropagation()}>
-            <img
-                className="card-modal-img"
-                src={selectedCard.imageUrl}
-                alt={selectedCard.name}
-            />
-            <div className="card-modal-info">
-                <div className="card-modal-name">{selectedCard.name}</div>
-                <div className="card-modal-rarity">{selectedCard.rarity}</div>
-            </div>
+        <div className={`card-modal-img-wrap ${collectedCards.has(selectedCard.imageUrl) ? 'collected' : ''}`}>
+  <img
+    className="card-modal-img"
+    src={selectedCard.imageUrl}
+    alt={selectedCard.name}
+  />
+</div>
+
             <button
                 className="card-modal-close"
                 onClick={() => setSelectedCard(null)}
             >
                 ✕
             </button>
-        </div>
+
     </div>
 )}
         </main>
