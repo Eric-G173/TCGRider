@@ -733,3 +733,43 @@ card-container {
   width: 100%;
   margin-bottom: 20px;
 }
+
+.browse-view {
+  color: var(--app-white);
+  display: flex;
+  justify-content: center;
+}
+
+.game-link-list {
+  display: flex;
+  flex-direction:row;
+  gap: 20px;
+  padding: 16px;
+}
+
+.game-link {
+  color: var(--app-white);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 12px;
+  border-radius: var(--app-radius-sm);
+  border: 1px solid var(--app-border);
+}
+
+.game-link:hover {
+  background-color: var(--app-surface-hover);
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--app-white-muted);
+  cursor: pointer;
+  margin-top: 5px;
+  font-size: 15px;
+}
+
+.set-row {
+  color: var(--app-white-muted);
+  padding: 8px 0;
+}

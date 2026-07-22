@@ -33,7 +33,7 @@ function App() {
   const [selectedTracker, setSelectedTracker] = React.useState(null);
   const [cards, setCards] = React.useState([]);
   const [loadingCards, setLoadingCards] = React.useState(false);
-
+const [view, setView] = React.useState('empty');
   const [collectedCards, setCollectedCards] = React.useState(new Set());
 
 function toggleCollected(cardId) {
@@ -50,11 +50,17 @@ function toggleCollected(cardId) {
 
 const [selectedCard, setSelectedCard] = React.useState(null);
 
-  const trackers = [
-    { name: "Pokémon 151", setId: "sv3pt5", completed: 0, total: 165 },
-    { name: "Prismatic Evolution", setId: "sv8pt5", completed: 0, total: 193 },
-  ];
+  const [trackers, setTrackers] = React.useState([
+  ]);
 
+  function addTracker(newTracker) {
+    setTrackers(prev => {
+      if (prev.some(t => t.setID === newTracker.setID)) return prev;
+      return [...prev, newTracker];
+    });
+  }
+
+  
   const filteredTrackers = trackers.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -70,7 +76,7 @@ const collectedCount = cards.filter(card => collectedCards.has(card.imageUrl)).l
     setLoadingCards(true);
     setCards([]);
 
-    fetch(`http://localhost:5000/api/cards/${tracker.setId}`)
+    fetch(`http://localhost:5000/api/cards/${tracker.setID}`)
       .then(res => res.json())
       .then(data => {
         setCards(data);
@@ -78,6 +84,49 @@ const collectedCount = cards.filter(card => collectedCards.has(card.imageUrl)).l
       })
       .catch(() => setLoadingCards(false));
   }, [selectedTracker]);
+const [selectedGame, setSelectedGame] = React.useState(null);
+  const [availableSets, setAvailableSets] = React.useState([
+  {
+    game: "One Piece",
+    sets: [
+      { name: "Romance Dawn", setID: "op01" },
+    ]
+  },
+  {
+    game: "Topps",
+    sets: [
+      { name: "Match Attax", setID: "topps01" },
+    ]
+  }
+  ]);
+React.useEffect(() => {
+  let cancelled = false;
+  async function loadPokemonSets() {
+    try {
+      // request up to 250 sets in one call; adjust pageSize if needed
+      const res = await fetch("http://localhost:5000/api/sets/pokemon");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const sets = (json.data || []).map(s => ({ name: s.name, setID: s.id }));
+
+      if (cancelled) return;
+
+      // merge Pokémon group into availableSets (replace or add)
+      setAvailableSets(prev => {
+        // remove any existing Pokémon group
+        const others = prev.filter(g => g.game !== "Pokémon");
+        // add the Pokémon group with the fetched sets
+        return [{ game: "Pokémon", sets }, ...others];
+      });
+    } catch (err) {
+      console.error("Failed to load Pokémon sets", err);
+      // optional: setAvailableSets to include an error state or fallback list
+    }
+  }
+
+  loadPokemonSets();
+  return () => { cancelled = true; };
+}, []);
 
   return (
     <div className="App">
@@ -104,24 +153,28 @@ const collectedCount = cards.filter(card => collectedCards.has(card.imageUrl)).l
       </header>
 
       <div className="App-body">
-        <aside className="App-sidebar">
-          <button className="new-tracker">
-            <span className="btn-plus">+</span> New Tracker
-          </button>
-          {filteredTrackers.map((tracker, index) => (
-            <TaskBtn
-              key={index}
-              name={tracker.name}
-              completed={tracker.completed}
-              total={tracker.total}
-              isSelected={selectedTracker === index}
-              onClick={() => setSelectedTracker(index)}
-            />
-          ))}
-        </aside>
+  <aside className="App-sidebar">
+    <button className="new-tracker" onClick={() => setView('browse')}>
+      <span className="btn-plus">+</span> New Tracker
+    </button>
+
+    {filteredTrackers.map((tracker, index) => (
+      <TaskBtn
+        key={index}
+        name={tracker.name}
+        completed={tracker.completed}
+        total={tracker.total}
+        isSelected={selectedTracker === index}
+        onClick={() => {
+          setSelectedTracker(index);
+          setView('tracker');
+        }}
+      />
+    ))}
+  </aside>
 
         <main className="App-content">
-          {selectedTracker !== null ? (
+          {view === 'tracker' && selectedTracker !== null ? (
             
             <div className="tracker-view">
               
@@ -131,7 +184,7 @@ const collectedCount = cards.filter(card => collectedCards.has(card.imageUrl)).l
                 </h2>
                 
                 <p className="tracker-progress">
-                 {collectedCount} / {trackers[selectedTracker].total} cards collected
+                 {collectedCount} / {cards.length} cards collected
                 </p>
               </div>
 <div className="card-track-center">
@@ -185,6 +238,46 @@ const collectedCount = cards.filter(card => collectedCards.has(card.imageUrl)).l
                 </div>
               )}
             </div>
+             ) : view === 'browse' ? (
+ <div className="browse-view">
+  {selectedGame === null ? (
+    <div className="game-link-list">
+      {availableSets.map((group, i) => (
+        <div
+          className="game-link"
+          key={i}
+          onClick={() => setSelectedGame(group.game)}
+        >
+          {group.game}
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="set-list-view">
+      <button className="back-btn" onClick={() => setSelectedGame(null)}>
+        ← Back
+      </button>
+      <h3 className="game-title">{selectedGame}</h3>
+      <div className="set-list">
+        {availableSets
+          .find(group => group.game === selectedGame)
+          .sets.map((set, j) => (
+            <div className="set-row" key={j}>
+        
+              <button onClick={() => {
+                fetch(`http://localhost:5000/api/sync/${encodeURIComponent(set.setId)}`, { method: 'POST' });
+                addTracker({name: set.name, setID: set.setID});
+                console.log('install setId', set.setId);
+              }}
+                >
+              {set.name}
+              </button>
+            </div>
+          ))}
+      </div>
+    </div>
+  )}
+</div>
           ) : (
             <div className="tracker-empty">
               <p>Select a tracker to view cards</p>
