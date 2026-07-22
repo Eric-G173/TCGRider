@@ -1,13 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
+using DotNetEnv;
 
-//dotnet run this in 1 terminal to get backend going. Once done, open new terminal and run  Invoke-WebRequest -Uri http://localhost:5000/api/sync/sv3pt5 -Method POST      
-//Can go to http://localhost:5000/api/cards/sv3pt5 and see results
+Env.Load();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
+    options.AddPolicy("AllowReactApp", policy =>
     {
         policy.WithOrigins("http://localhost:3000")
               .AllowAnyMethod()
@@ -21,15 +22,30 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 
 var app = builder.Build();
-app.UseCors();
+app.UseCors("AllowReactApp");
+
+// shared client for the /api/sets/pokemon endpoint — created once, reused for every request
+var pokemonHttpClient = new HttpClient();
 
 app.MapGet("/ping", () => Results.Ok(new { status = "ok", message = "C# backend running" }));
 
-app.MapGet("/api/sets", () => {
-    return Results.Ok(new[] {
-        new { id = "sv8pt5", name = "Prismatic Evolution", total = 193 },
-        new { id = "sv3pt5", name = "Pokémon 151", total = 165 }
-    });
+app.MapGet("/api/sets/pokemon", async () => {
+    try
+    {
+        var response = await pokemonHttpClient.GetFromJsonAsync<List<TcgdexSetBrief>>(
+            "https://api.tcgdex.net/v2/en/sets"
+        );
+
+        var sets = response?.Select(s => new { name = s.Name, setID = s.Id }).ToList()
+                   ?? new List<object>();
+
+        return Results.Ok(sets);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"TCGdex API error: {ex.GetType().Name} - {ex.Message}");
+        return Results.Ok(new List<object>());
+    }
 });
 
 app.MapGet("/api/cards/{setId}", (string setId) => {
