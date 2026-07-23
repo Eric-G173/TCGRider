@@ -36,9 +36,10 @@ app.MapGet("/api/sets/pokemon", async () => {
             "https://api.tcgdex.net/v2/en/sets"
         );
 
-        var sets = response?.Select(s => new { name = s.Name, setID = s.Id }).ToList()
-                   ?? new List<object>();
+        if (response == null)
+            return Results.Ok(new List<object>());
 
+        var sets = response.Select(s => new { name = s.Name, setID = s.Id }).ToList();
         return Results.Ok(sets);
     }
     catch (Exception ex)
@@ -52,7 +53,7 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
     using var connection = Database.GetConnection();
     var command = connection.CreateCommand();
     command.CommandText = @"
-        SELECT name, rarity, image_url 
+        SELECT id, name, rarity, image_url 
         FROM Cards 
         WHERE set_id = $setId
         ORDER BY CAST(number AS INTEGER)
@@ -64,13 +65,17 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
     while (reader.Read())
     {
         cards.Add(new {
-            name = reader.GetString(0),
-            rarity = reader.IsDBNull(1) ? "" : reader.GetString(1),
-            imageUrl = reader.IsDBNull(2) ? "" : reader.GetString(2)
+            id = reader.GetString(0),
+            name = reader.GetString(1),
+            rarity = reader.IsDBNull(2) ? "" : reader.GetString(2),
+            imageUrl = reader.IsDBNull(3) ? "" : reader.GetString(3)
         });
     }
 
-    return Results.Ok(cards);
+    bool hasMissingImages = cards.Any(c => string.IsNullOrEmpty(((dynamic)c).imageUrl));
+
+
+    return Results.Ok(new {cards, hasMissingImages});
 });
 
 app.MapPost("/api/sync/{setId}", async (string setId) => {
