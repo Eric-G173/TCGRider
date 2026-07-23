@@ -35,7 +35,8 @@ function App() {
   const [loadingCards, setLoadingCards] = React.useState(false);
 const [view, setView] = React.useState('empty');
   const [collectedCards, setCollectedCards] = React.useState(new Set());
-
+  const [hasMissingImages, setHasMissingImages] = React.useState(false);
+const [syncingSets, setSyncingSets] = React.useState(new Set());
 function toggleCollected(cardId) {
     setCollectedCards(prev => {
         const updated = new Set(prev);
@@ -60,7 +61,28 @@ const [selectedCard, setSelectedCard] = React.useState(null);
     });
   }
 
-  
+  async function syncAndAddSet(set) {
+  setSyncingSets(prev => new Set(prev).add(set.setID));
+
+  try {
+    const res = await fetch(`http://localhost:5000/api/sync/${encodeURIComponent(set.setID)}`, {
+      method: 'POST'
+    });
+    if (!res.ok) throw new Error(`Sync failed: HTTP ${res.status}`);
+
+    addTracker({ name: set.name, setID: set.setID });
+  } catch (err) {
+    console.error(`Failed to sync set ${set.setID}`, err);
+    // optionally: show an error toast/message here
+  } finally {
+    setSyncingSets(prev => {
+      const updated = new Set(prev);
+      updated.delete(set.setID);
+      return updated;
+    });
+  }
+}
+
   const filteredTrackers = trackers.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -68,22 +90,23 @@ const [selectedCard, setSelectedCard] = React.useState(null);
     const filteredCards = cards.filter(card =>
     card.name.toLowerCase().includes(cardSearch.toLowerCase())
   );
-const collectedCount = cards.filter(card => collectedCards.has(card.imageUrl)).length;
+const collectedCount = cards.filter(card => collectedCards.has(card.id)).length;
   React.useEffect(() => {
-    if (selectedTracker === null) return;
+  if (selectedTracker === null) return;
 
-    const tracker = trackers[selectedTracker];
-    setLoadingCards(true);
-    setCards([]);
+  const tracker = trackers[selectedTracker];
+  setLoadingCards(true);
+  setCards([]);
 
-    fetch(`http://localhost:5000/api/cards/${tracker.setID}`)
-      .then(res => res.json())
-      .then(data => {
-        setCards(data);
-        setLoadingCards(false);
-      })
-      .catch(() => setLoadingCards(false));
-  }, [selectedTracker]);
+  fetch(`http://localhost:5000/api/cards/${tracker.setID}`)
+    .then(res => res.json())
+    .then(data => {
+      setCards(data.cards);
+      setHasMissingImages(data.hasMissingImages);
+      setLoadingCards(false);
+    })
+    .catch(() => setLoadingCards(false));
+}, [selectedTracker]);
 const [selectedGame, setSelectedGame] = React.useState(null);
   const [availableSets, setAvailableSets] = React.useState([
   {
@@ -102,27 +125,21 @@ const [selectedGame, setSelectedGame] = React.useState(null);
 React.useEffect(() => {
   let cancelled = false;
   async function loadPokemonSets() {
-    try {
-      // request up to 250 sets in one call; adjust pageSize if needed
-      const res = await fetch("http://localhost:5000/api/sets/pokemon");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const sets = (json.data || []).map(s => ({ name: s.name, setID: s.id }));
+  try {
+    const res = await fetch("http://localhost:5000/api/sets/pokemon");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const sets = await res.json(); // already [{ name, setID }, ...] — no remapping needed
 
-      if (cancelled) return;
+    if (cancelled) return;
 
-      // merge Pokémon group into availableSets (replace or add)
-      setAvailableSets(prev => {
-        // remove any existing Pokémon group
-        const others = prev.filter(g => g.game !== "Pokémon");
-        // add the Pokémon group with the fetched sets
-        return [{ game: "Pokémon", sets }, ...others];
-      });
-    } catch (err) {
-      console.error("Failed to load Pokémon sets", err);
-      // optional: setAvailableSets to include an error state or fallback list
-    }
+    setAvailableSets(prev => {
+      const others = prev.filter(g => g.game !== "Pokémon");
+      return [{ game: "Pokémon", sets }, ...others];
+    });
+  } catch (err) {
+    console.error("Failed to load Pokémon sets", err);
   }
+}
 
   loadPokemonSets();
   return () => { cancelled = true; };
@@ -182,7 +199,11 @@ React.useEffect(() => {
                 <h2 className="tracker-title">
                   {trackers[selectedTracker].name}
                 </h2>
-                
+                {hasMissingImages && (
+    <p className="tracker-disclaimer">
+      * Cards in this set do not have images
+    </p>
+  )}
                 <p className="tracker-progress">
                  {collectedCount} / {cards.length} cards collected
                 </p>
@@ -203,7 +224,7 @@ React.useEffect(() => {
               ) : (
                 <div className="card-grid">
                   {filteredCards.map((card, i) => {
-  const isCollected = collectedCards.has(card.imageUrl);
+const isCollected = collectedCards.has(card.id);
 
   return (
    <div className="card-item" key={i}>
@@ -226,7 +247,7 @@ React.useEffect(() => {
     className={`card-collect-btn ${isCollected ? 'card-collect-btn-yes' : 'card-collect-btn-no'}`}
     onClick={(e) => {
       e.stopPropagation();
-      toggleCollected(card.imageUrl);
+      toggleCollected(card.id);
     }}
   >
     {isCollected ? '✓ Collected' : 'Collect'}
@@ -253,29 +274,30 @@ React.useEffect(() => {
       ))}
     </div>
   ) : (
-    <div className="set-list-view">
-      <button className="back-btn" onClick={() => setSelectedGame(null)}>
-        ← Back
-      </button>
-      <h3 className="game-title">{selectedGame}</h3>
-      <div className="set-list">
-        {availableSets
-          .find(group => group.game === selectedGame)
-          .sets.map((set, j) => (
-            <div className="set-row" key={j}>
-        
-              <button onClick={() => {
-                fetch(`http://localhost:5000/api/sync/${encodeURIComponent(set.setId)}`, { method: 'POST' });
-                addTracker({name: set.name, setID: set.setID});
-                console.log('install setId', set.setId);
-              }}
-                >
-              {set.name}
-              </button>
-            </div>
-          ))}
-      </div>
-    </div>
+   <div className="set-list-view">
+  <button className="back-btn" onClick={() => setSelectedGame(null)}>
+    ← Back
+  </button>
+  <h3 className="game-title">{selectedGame}</h3>
+  <div className="set-list">
+    {availableSets
+      .find(group => group.game === selectedGame)
+      .sets.map((set, j) => {
+        const isSyncing = syncingSets.has(set.setID);
+        const isTracked = trackers.some(t => t.setID === set.setID);
+        return (
+          <div className="set-row" key={j}>
+            <button
+               disabled={isSyncing || isTracked}
+              onClick={() => syncAndAddSet(set)}
+            >
+              {isSyncing ? `Syncing ${set.name}...` : set.name}
+            </button>
+          </div>
+        );
+      })}
+  </div>
+</div>
   )}
 </div>
           ) : (
@@ -285,20 +307,13 @@ React.useEffect(() => {
           )}
           {selectedCard && (
     <div className="card-modal-overlay" onClick={() => setSelectedCard(null)}>
-        <div className={`card-modal-img-wrap ${collectedCards.has(selectedCard.imageUrl) ? 'collected' : ''}`}>
+        <div className={`card-modal-img-wrap ${collectedCards.has(selectedCard.id) ? 'collected' : ''}`}>
   <img
     className="card-modal-img"
     src={selectedCard.imageUrl}
     alt={selectedCard.name}
   />
 </div>
-
-            <button
-                className="card-modal-close"
-                onClick={() => setSelectedCard(null)}
-            >
-                ✕
-            </button>
 
     </div>
 )}
