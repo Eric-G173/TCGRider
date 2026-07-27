@@ -2,38 +2,33 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron')
 const path = require('path')
 
 function createWindow() {
-  const { workArea } = screen.getPrimaryDisplay();
-
   const win = new BrowserWindow({
-    x: workArea.x,
-    y: workArea.y,
-    width: workArea.width,
-    height: workArea.height,
-    useContentSize: true,
+    width: 1000,
+    height: 700,
     minWidth: 900,
     minHeight: 600,
     icon: path.join(__dirname, 'icon.png'),
+    resizable: true,
     frame: false,
+    show: false, // avoid flash before maximize
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
     }
   })
 
-  let isMaximized = true; // starts true since we're opening at full workArea size
-  let previousBounds = null;
+  win.once('ready-to-show', () => {
+    win.maximize(); // native OS maximize — no resize cursor at edges
+    win.show();
+  });
 
   ipcMain.on('window-minimize', () => win.minimize());
 
   ipcMain.on('window-maximize', () => {
-    if (isMaximized) {
-      win.setBounds(previousBounds || { x: 100, y: 100, width: 1000, height: 700 });
-      isMaximized = false;
+    if (win.isMaximized()) {
+      win.unmaximize();
     } else {
-      previousBounds = win.getBounds();
-      const { workArea } = screen.getPrimaryDisplay();
-      win.setBounds(workArea);
-      isMaximized = true;
+      win.maximize();
     }
   });
 
