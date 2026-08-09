@@ -6,9 +6,6 @@ obj/
 
 .env
 
-DatabaseLoader.cs
 
-.env
-
-C#-backend/tcgrider.sqbpro
-C#-backend/tcgrider.db
+backend/tcgrider.sqbpro
+backend/tcgrider.db
