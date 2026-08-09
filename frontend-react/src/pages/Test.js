@@ -27,16 +27,51 @@ function AppName() {
 {/**/}
 function App() {
     {/* the consts are react state variables. */}
-  const { ipcRenderer } = window.require('electron'); {/*This connects to the electron.js file*/}
+    const { ipcRenderer } = window.require('electron');
   const [search, setSearch] = React.useState('');
-  const [cardSearch, setCardSearch] = React.useState('');
-  const [selectedTracker, setSelectedTracker] = React.useState(null);
-  const [cards, setCards] = React.useState([]);
-  const [loadingCards, setLoadingCards] = React.useState(false);
+const [cardSearch, setCardSearch] = React.useState('');
+const [selectedTracker, setSelectedTracker] = React.useState(null);
+const [cards, setCards] = React.useState([]);
+const [loadingCards, setLoadingCards] = React.useState(false);
 const [view, setView] = React.useState('empty');
-  const [collectedCards, setCollectedCards] = React.useState(new Set());
-  const [hasMissingImages, setHasMissingImages] = React.useState(false);
+const [collectedCards, setCollectedCards] = React.useState(new Set());
+const [hasMissingImages, setHasMissingImages] = React.useState(false);
 const [syncingSets, setSyncingSets] = React.useState(new Set());
+const [selectedCardIds, setSelectedCardIds] = React.useState(new Set());
+const [dragBox, setDragBox] = React.useState(null);
+const [cardContextMenu, setCardContextMenu] = React.useState(null);
+const [selectedCard, setSelectedCard] = React.useState(null);          // moved up
+const [trackers, setTrackers] = React.useState([]);                     // moved up
+const [selectedGame, setSelectedGame] = React.useState(null);           // moved up
+const [availableSets, setAvailableSets] = React.useState([
+  {
+    game: "One Piece",
+    sets: [
+      { name: "Romance Dawn", setID: "op01" },
+    ]
+  },
+  {
+    game: "Topps",
+    sets: [
+      { name: "Match Attax", setID: "topps01" },
+    ]
+  }]);
+
+const cardGridRef = React.useRef(null);
+const cardRefs = React.useRef({});
+const dragStartContentRef  = React.useRef(null);
+const lastRawPointRef = React.useRef(null); 
+const isDraggingRef = React.useRef(false);
+const additiveDragRef = React.useRef(false);
+
+// NOW it's safe — trackers and cards both exist by this point
+const filteredTrackers = trackers.filter(t =>
+  t.name.toLowerCase().includes(search.toLowerCase())
+);
+const filteredCards = cards.filter(card =>
+  card.name.toLowerCase().includes(cardSearch.toLowerCase())
+);
+  
 function toggleCollected(cardId) {
     setCollectedCards(prev => {
         const updated = new Set(prev);
@@ -49,10 +84,121 @@ function toggleCollected(cardId) {
     });
 }
 
-const [selectedCard, setSelectedCard] = React.useState(null);
+function getRelativePoint(e) {
+  const rect = cardGridRef.current.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
 
-  const [trackers, setTrackers] = React.useState([
-  ]);
+function rectsIntersect(a, b) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+const recomputeDragSelection = React.useCallback(() => {
+  const grid = cardGridRef.current;
+  if (!grid || !dragStartContentRef.current || !lastRawPointRef.current) return;
+
+  const start = dragStartContentRef.current;
+  const currentContent = {
+    x: lastRawPointRef.current.x + grid.scrollLeft,
+    y: lastRawPointRef.current.y + grid.scrollTop,
+  };
+
+  const x = Math.min(currentContent.x, start.x);
+  const y = Math.min(currentContent.y, start.y);
+  const w = Math.abs(currentContent.x - start.x);
+  const h = Math.abs(currentContent.y - start.y);
+
+  // content-space box — matches absolute positioning inside the scrollable grid directly
+  setDragBox({ x, y, w, h });
+
+  // convert back to viewport space just for intersection testing against card rects
+  const containerRect = grid.getBoundingClientRect();
+  const boxRect = {
+    left: containerRect.left + (x - grid.scrollLeft),
+    top: containerRect.top + (y - grid.scrollTop),
+    right: containerRect.left + (x + w - grid.scrollLeft),
+    bottom: containerRect.top + (y + h - grid.scrollTop),
+  };
+
+  const intersecting = new Set();
+  for (const card of filteredCards) {
+    const el = cardRefs.current[card.id];
+    if (!el) continue;
+    if (rectsIntersect(boxRect, el.getBoundingClientRect())) intersecting.add(card.id);
+  }
+
+  setSelectedCardIds(prev => {
+    const base = additiveDragRef.current ? new Set(prev) : new Set();
+    intersecting.forEach(id => base.add(id));
+    return base;
+  });
+}, [filteredCards]);
+
+function handleGridMouseDown(e) {
+  if (e.button !== 0) return;
+  if (e.target.closest('[data-card-id]')) return;
+  if (e.target.closest('.card-context-menu')) return;
+  e.preventDefault();
+
+  setCardContextMenu(null);
+  additiveDragRef.current = e.shiftKey || e.metaKey || e.ctrlKey;
+  if (!additiveDragRef.current) setSelectedCardIds(new Set());
+
+  const grid = cardGridRef.current;
+  const point = getRelativePoint(e);
+  lastRawPointRef.current = point;
+  dragStartContentRef.current = {
+    x: point.x + grid.scrollLeft,
+    y: point.y + grid.scrollTop,
+  };
+  isDraggingRef.current = true;
+  setDragBox({ x: dragStartContentRef.current.x, y: dragStartContentRef.current.y, w: 0, h: 0 });
+}
+const handleDragMouseMove = React.useCallback((e) => {
+  if (!isDraggingRef.current || !cardGridRef.current) return;
+  lastRawPointRef.current = getRelativePoint(e);
+  recomputeDragSelection();
+}, [recomputeDragSelection]);
+
+const handleDragMouseUp = React.useCallback(() => {
+  isDraggingRef.current = false;
+  dragStartContentRef.current = null;
+  lastRawPointRef.current = null;
+  setDragBox(null);
+}, []);
+
+
+const handleGridScroll = React.useCallback(() => {
+  if (!isDraggingRef.current) return;
+  recomputeDragSelection();
+}, [recomputeDragSelection]);
+
+function handleCardGridContextMenu(e) {
+  e.preventDefault();
+  if (selectedCardIds.size === 0) return;
+  const grid = cardGridRef.current;
+  const rect = grid.getBoundingClientRect();
+  setCardContextMenu({
+    x: e.clientX - rect.left + grid.scrollLeft,
+    y: e.clientY - rect.top + grid.scrollTop,
+  });
+}
+
+function applyBulkCollectAction(mode) {
+  setCollectedCards(prev => {
+    const updated = new Set(prev);
+    selectedCardIds.forEach(id => {
+      if (mode === 'collect') updated.add(id);
+      else if (mode === 'uncollect') updated.delete(id);
+      else if (mode === 'toggle') {
+        updated.has(id) ? updated.delete(id) : updated.add(id);
+      }
+    });
+    return updated;
+  });
+  setCardContextMenu(null);
+}
+
+
 
   function addTracker(newTracker) {
     setTrackers(prev => {
@@ -83,13 +229,6 @@ const [selectedCard, setSelectedCard] = React.useState(null);
   }
 }
 
-  const filteredTrackers = trackers.filter(t =>
-    t.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-    const filteredCards = cards.filter(card =>
-    card.name.toLowerCase().includes(cardSearch.toLowerCase())
-  );
 const collectedCount = cards.filter(card => collectedCards.has(card.id)).length;
   React.useEffect(() => {
   if (selectedTracker === null) return;
@@ -107,21 +246,6 @@ const collectedCount = cards.filter(card => collectedCards.has(card.id)).length;
     })
     .catch(() => setLoadingCards(false));
 }, [selectedTracker]);
-const [selectedGame, setSelectedGame] = React.useState(null);
-  const [availableSets, setAvailableSets] = React.useState([
-  {
-    game: "One Piece",
-    sets: [
-      { name: "Romance Dawn", setID: "op01" },
-    ]
-  },
-  {
-    game: "Topps",
-    sets: [
-      { name: "Match Attax", setID: "topps01" },
-    ]
-  }
-  ]);
 React.useEffect(() => {
   let cancelled = false;
   async function loadPokemonSets() {
@@ -141,23 +265,33 @@ React.useEffect(() => {
   }
 }
 
+
   loadPokemonSets();
   return () => { cancelled = true; };
 }, []);
+React.useEffect(() => {
+  window.addEventListener('mousemove', handleDragMouseMove);
+  window.addEventListener('mouseup', handleDragMouseUp);
+  return () => {
+    window.removeEventListener('mousemove', handleDragMouseMove);
+    window.removeEventListener('mouseup', handleDragMouseUp);
+  };
+}, [handleDragMouseMove, handleDragMouseUp]);
+
 
   return (
     <div className="App">
       <header className="App-header">
-        <Logo />
-        <AppName />
-        <div className="header-center">
-          <input
+         <input
             className="header-search"
             type="text"
             placeholder="Search Trackers..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        <div className="header-center">
+         <Logo />
+        <AppName />
         </div>
         <div className="drag-region" />
         <div className="window-controls">
@@ -222,12 +356,22 @@ React.useEffect(() => {
                   <p>Loading cards...</p>
                 </div>
               ) : (
-                <div className="card-grid">
+                <div className="card-grid"
+                ref={cardGridRef}
+  onMouseDown={handleGridMouseDown}
+  onContextMenu={handleCardGridContextMenu}
+  onScroll={handleGridScroll}
+                >
+                  
                   {filteredCards.map((card, i) => {
 const isCollected = collectedCards.has(card.id);
 
   return (
-   <div className="card-item" key={i}>
+   <div 
+   className={`card-item ${selectedCardIds.has(card.id) ? 'card-item-selected' : ''}`}
+  data-card-id={card.id}
+  ref={(el) => (cardRefs.current[card.id] = el)}
+  key={i}>
   <div className="card-name">{card.name}</div>
 
   <div
@@ -255,6 +399,33 @@ const isCollected = collectedCards.has(card.id);
 </div>
   );
 })}
+{dragBox && (
+  <div
+    className="drag-select-box"
+    style={{
+      left: dragBox.x, top: dragBox.y,
+      width: dragBox.w, height: dragBox.h,
+    }}
+  />
+)}
+
+{cardContextMenu && (
+  <div
+    className="card-context-menu"
+    style={{ left: cardContextMenu.x, top: cardContextMenu.y }}
+    onMouseLeave={() => setCardContextMenu(null)}
+  >
+    <div className="card-context-menu-item" onClick={() => applyBulkCollectAction('collect')}>
+      Mark {selectedCardIds.size} as collected
+    </div>
+    <div className="card-context-menu-item" onClick={() => applyBulkCollectAction('uncollect')}>
+      Mark {selectedCardIds.size} as uncollected
+    </div>
+    <div className="card-context-menu-item" onClick={() => applyBulkCollectAction('toggle')}>
+      Toggle each
+    </div>
+  </div>
+)}
 
                 </div>
               )}
@@ -287,7 +458,7 @@ const isCollected = collectedCards.has(card.id);
         const isTracked = trackers.some(t => t.setID === set.setID);
         return (
           <div className="set-row" key={j}>
-            <button
+            <button className = "set-button"
                disabled={isSyncing || isTracked}
               onClick={() => syncAndAddSet(set)}
             >
@@ -320,18 +491,7 @@ const isCollected = collectedCards.has(card.id);
         </main>
       </div>
 
-      <footer className="App-footer">
-        <div className="footer-bar">
-          <div className="footer-left">
-            <button className="icon-btn" aria-label="Profile">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </footer>
+
     </div>
   );
 }
