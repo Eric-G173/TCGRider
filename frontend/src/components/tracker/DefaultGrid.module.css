@@ -1,0 +1,10 @@
+.tracker-empty {
+  /* Shown when no tracker is selected OR cards are loading
+     height: 100% + flex centering puts the message in the dead center of the content area */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--app-white);
+  font-size: 14px;
+}
