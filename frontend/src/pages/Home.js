@@ -1,19 +1,7 @@
-import logo from '../logo.png';
 import React from 'react';
 import styles from './Home.module.css';
 import TopBar from '../components/layout/TopBar';
-function TaskBtn({ name, onClick, isSelected }) {
-  return (
-    <button
-      className={`${styles['new-btn']} ${isSelected ? styles['new-btn-active'] : ''}`}
-      onClick={onClick}
-    >
-      {name}
-    </button>
-  )
-}
-
-
+import Sidebar from '../components/layout/Sidebar'
 
 function App() {
   const [search, setSearch] = React.useState('');
@@ -268,25 +256,7 @@ function App() {
  <TopBar search={search} setSearch = {setSearch}/>
 
       <div className={styles['App-body']}>
-        <aside className={styles['App-sidebar']}>
-          <button className={styles['new-tracker']} onClick={() => setView('browse')}>
-            <span className={styles['btn-plus']}>+</span> New Tracker
-          </button>
-
-          {filteredTrackers.map((tracker, index) => (
-            <TaskBtn
-              key={index}
-              name={tracker.name}
-              completed={tracker.completed}
-              total={tracker.total}
-              isSelected={selectedTracker === index}
-              onClick={() => {
-                setSelectedTracker(index);
-                setView('tracker');
-              }}
-            />
-          ))}
-        </aside>
+       <Sidebar setView ={setView} filteredTrackers={filteredTrackers} selectedTracker={selectedTracker} setSelectedTracker={setSelectedTracker}/>
 
         <main className={styles['App-content']}>
           {view === 'tracker' && selectedTracker !== null ? (

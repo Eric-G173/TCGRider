@@ -1,0 +1,90 @@
+.App-sidebar {
+  width: 225px;
+  height: 100%;       /* stretch to full height of App-body */
+  border-right: 2px solid var(--app-sidebar-border); /* the divider line */
+  flex-shrink: 0;     /* prevents sidebar from shrinking when window is narrow */
+  overflow-y: auto;   /* allows sidebar to scroll vertically if trackers overflow */
+}
+
+.App-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.App-sidebar::-webkit-scrollbar-track {
+  background: var(--app-bg);
+}
+
+.App-sidebar::-webkit-scrollbar-thumb {
+  background-color: var(--app-surface-hover);
+  border-radius: 8px;
+}
+
+.App-sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.new-tracker {
+  /* The "+ New Tracker" button at the top of the sidebar
+     calc() lets you do math in CSS
+     calc(100% - 24px) = full width minus 12px margin on each side */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 12px;
+  padding: 8px 16px;
+  width: calc(100% - 24px);
+  background-color: var(--app-shell);
+  color: var(--app-white);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background-color 0.15s ease;
+  /* transition animates property changes smoothly
+     0.15s = animation duration, ease = starts fast then slows down */
+}
+
+.new-tracker:hover {
+  background-color: var(--app-surface-hover);
+}
+
+.btn-plus {
+  /* The + icon inside the New Tracker button */
+  font-size: 1.5rem;
+  line-height: 1; /* prevents the large font from adding extra vertical space */
+}
+
+.new-btn {
+  /* Individual tracker buttons in the sidebar list (Pokémon 151, Prismatic Evolution etc)
+     Same styling as .new-tracker but with extra top margin to space it from the button above */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 24px 12px 12px 12px; /* margin shorthand: top right bottom left */
+  padding: 8px 16px;
+  width: calc(100% - 24px);
+  background-color: var(--app-shell);
+  color: var(--app-white);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background-color 0.15s ease;
+}
+
+.new-btn:hover {
+  background-color: var(--app-surface-hover);
+}
+
+.new-btn-active {
+  /* Applied via React when this tracker is currently selected
+     In JSX: className={`new-btn ${isSelected ? 'new-btn-active' : ''}`}
+     This class gets added on top of .new-btn, overriding specific properties */
+  background-color: var(--app-surface-hover);
+  border-color: var(--app-border-bright);
+}
+
