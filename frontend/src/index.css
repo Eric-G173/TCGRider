@@ -1,13 +1,35 @@
-body {
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+html, body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+* {
+  font-family: 'Inter', sans-serif;
+}
+
+:root {
+  --app-bg: rgb(23, 23, 32);
+  --app-shell: rgb(38, 38, 51);
+  --app-surface: rgb(23, 23, 32);
+  --app-surface-hover: rgb(38, 38, 51);
+
+  --app-white: rgb(255, 255, 255);
+  --app-white-muted: rgba(255, 255, 255, 0.5);
+
+  --app-border: rgba(180, 188, 214, 0.14);
+  --app-border-bright: rgba(180, 188, 214, 0.24);
+  --app-sidebar-border: rgba(180, 188, 214, 0.22);
+
+  --app-radius-sm: 8px;
+  --app-radius-md: 12px;
+
+  --window-btn-hover: rgba(255, 255, 255, 0.1);
+  --window-btn-close-hover: rgb(237, 66, 69);
+
+  --icon-btn-bg: rgba(58, 58, 76, 0.6);
+  --icon-btn-hover: rgba(70, 70, 92, 0.8);
 }
