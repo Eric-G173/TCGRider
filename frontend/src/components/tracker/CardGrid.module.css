@@ -1,0 +1,245 @@
+.tracker-view {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0 0 0;
+  height: 100%;
+}
+
+.tracker-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 4px;
+}
+
+.tracker-title {
+  color: var(--app-white);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.tracker-disclaimer {
+  /* Not in your old CSS — this class was referenced in the JSX but never styled */
+  color: var(--app-white-muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.tracker-progress {
+  color: var(--app-white);
+  font-size: 13px;
+  margin: 0;
+}
+
+.tracker-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--app-white);
+  font-size: 14px;
+}
+
+.card-track-center {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+
+.card-search {
+  background-color: var(--app-bg);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-white);
+  font-size: 13px;
+  padding: 4px 10px;
+  width: 200px;
+  outline: none;
+}
+
+.card-search::placeholder {
+  color: var(--app-white-muted);
+}
+
+.card-search:focus {
+  border-color: var(--app-border-bright);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.card-grid {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  border-bottom: 10px solid var(--app-bg);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 40px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px 100px 24px 66px;
+  -webkit-user-select: none;
+}
+
+.card-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.card-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.card-grid::-webkit-scrollbar-thumb {
+  background-color: var(--app-border, rgba(255, 255, 255, 0.2));
+  border-radius: 4px;
+}
+
+.card-grid::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-border-bright, rgba(255, 255, 255, 0.35));
+}
+
+.card-item {
+  aspect-ratio: 2/3;
+  color: var(--app-white);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px;
+  gap: 2px;
+}
+
+.card-item:hover {
+  border-color: var(--app-border-bright);
+}
+
+.card-item-selected {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.card-name {
+  font-size: 15px;
+  color: var(--app-white);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  width: 100%;
+  padding-bottom: 6px;
+}
+
+.card-img-wrap {
+  width: fit-content;
+  height: fit-content;
+  flex: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+}
+
+.card-img-wrap.collected {
+  border-color: #ffd700;
+  box-shadow: 0 0 12px 7px rgba(255, 215, 0, 0.5);
+}
+
+.card-img {
+  height: 100%;
+  width: 100%;
+  flex: 1;
+  object-fit: contain;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.card-collect-btn {
+  width: 100%;
+  padding: 2px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-collect-btn-no {
+  background-color: var(--app-surface);
+  color: var(--app-white-muted);
+  border: 1px solid var(--app-border);
+}
+
+.card-collect-btn-no:hover {
+  background-color: var(--app-surface-hover);
+  color: var(--app-white);
+}
+
+.card-collect-btn-yes {
+  background-color: rgba(15, 110, 86, 0.15);
+  border: 1px solid rgba(29, 158, 117, 0.6);
+  color: rgb(29, 158, 117);
+}
+
+.card-collect-btn-yes:hover {
+  background-color: rgba(15, 110, 86, 0.25);
+}
+
+.drag-select-box {
+  position: absolute;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid #6366f1;
+  pointer-events: none;
+}
+
+.card-context-menu {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 10;
+  min-width: 190px;
+  overflow: hidden;
+}
+
+.card-context-menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.card-context-menu-item:hover {
+  background: #f4f4f5;
+}
+
+.card-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.card-modal-img-wrap {
+  border: 3px solid transparent;
+}
+
+.card-modal-img-wrap.collected {
+  /* Not in your old CSS — added to mirror .card-img-wrap.collected so the modal
+     also shows the gold "collected" glow, not just the grid thumbnail */
+  border-color: #ffd700;
+  box-shadow: 0 0 12px 7px rgba(255, 215, 0, 0.5);
+}
+
+.card-modal-img {
+  max-height: 70vh;
+  width: auto;
+  display: block;
+}

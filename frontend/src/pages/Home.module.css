@@ -1,74 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-/* @import pulls in an external font from Google Fonts
-   Inter is a clean, modern font used by most professional apps
-   wght@400;500;600 loads three font weights: regular, medium, semibold */
+
 html, body {
   margin: 0;
   padding: 0;
   height: 100%;
   overflow: hidden;
 }
+
 * {
   font-family: 'Inter', sans-serif;
-  /* The * selector means "apply to every single element on the page"
-     sans-serif is the fallback if Inter fails to load */
 }
 
 :root {
-  /* :root is the top-level element of the page (the <html> tag)
-     Defining variables here makes them available everywhere in your CSS
-     Think of it like declaring constants at the top of a file
-     Syntax: --variable-name: value;
-     Usage: color: var(--variable-name); */
+  --app-bg: rgb(23, 23, 32);
+  --app-shell: rgb(38, 38, 51);
+  --app-surface: rgb(23, 23, 32);
+  --app-surface-hover: rgb(38, 38, 51);
 
-  /* ── Backgrounds ──
-     These control what color surfaces/areas appear as */
-  --app-bg: rgb(23, 23, 32);           /* main dark background of the whole app */
-  --app-shell: rgb(38, 38, 51);        /* slightly lighter — used for header/footer/buttons */
-  --app-surface: rgb(23, 23, 32);      /* card/button backgrounds */
-  --app-surface-hover: rgb(38, 38, 51);   /* slightly lighter version shown on hover */
+  --app-white: rgb(255, 255, 255);
+  --app-white-muted: rgba(255, 255, 255, 0.5);
 
-  /* ── Text colors ──
-     rgba() is the same as rgb() but with a 4th value for opacity (0 = invisible, 1 = full) */
-  --app-white: rgb(255, 255, 255);           /* full white for main text */
-  --app-white-muted: rgba(255, 255, 255, 0.5); /* 50% transparent white for secondary text */
+  --app-border: rgba(180, 188, 214, 0.14);
+  --app-border-bright: rgba(180, 188, 214, 0.24);
+  --app-sidebar-border: rgba(180, 188, 214, 0.22);
 
-  /* ── Borders ──
-     Low opacity white on a dark background creates subtle, visible borders */
---app-border: rgba(180, 188, 214, 0.14);        /* was: rgba(255, 255, 255, 0.12) */
---app-border-bright: rgba(180, 188, 214, 0.24);  /* was: rgba(255, 255, 255, 0.18) */
---app-sidebar-border: rgba(180, 188, 214, 0.22);
+  --app-radius-sm: 8px;
+  --app-radius-md: 12px;
 
-  /* ── Border radius ──
-     Controls how rounded corners are. 0 = sharp corners, higher = more rounded */
-  --app-radius-sm: 8px;   /* small rounding — used on buttons, cards */
-  --app-radius-md: 12px;  /* medium rounding — used on the floating footer */
+  --window-btn-hover: rgba(255, 255, 255, 0.1);
+  --window-btn-close-hover: rgb(237, 66, 69);
 
-  /* ── Window control buttons (minimize, maximize, close) ── */
-  --window-btn-hover: rgba(255, 255, 255, 0.1);  /* subtle highlight on hover */
-  --window-btn-close-hover: rgb(237, 66, 69);     /* red on close button hover (matches Windows) */
-
-  /* ── Icon buttons (profile, notifications in footer) ── */
-  --icon-btn-bg: rgba(58, 58, 76, 0.6);     /* was: rgba(255, 255, 255, 0.1) — a lightened version of app-shell */
---icon-btn-hover: rgba(70, 70, 92, 0.8);
+  --icon-btn-bg: rgba(58, 58, 76, 0.6);
+  --icon-btn-hover: rgba(70, 70, 92, 0.8);
 }
 
-/* ─────────────────────────────────────────
-   APP SHELL
-   The outermost container and its main sections
-───────────────────────────────────────── */
-
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow: hidden;
-}
 .App {
-  /* This is the root div that wraps everything
-     display: flex + flex-direction: column stacks children vertically (header, body, footer)
-     height: 100vh means "100% of the viewport height" — fills the whole window
-     overflow: hidden prevents any child from creating a scrollbar on the App itself */
   background-color: var(--app-bg);
   display: flex;
   flex-direction: column;
@@ -77,406 +43,19 @@ html, body {
 }
 
 .App-body {
-  display: flex;      /* lays sidebar + main content side by side */
-  flex: 1;             /* fills all remaining height under the header */
-  min-height: 0;       /* prevents flex children from refusing to shrink/scroll properly */
-  overflow: hidden;    /* App-content handles its own internal scrolling */
-}
-
-.footer-left {
   display: flex;
-  align-items: center;
-  gap: 2rem; /* space between each icon button */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
-
-.icon-btn {
-  /* Circular icon buttons in the footer
-     border-radius: 50% on an equal width/height element creates a perfect circle */
-  -webkit-app-region: no-drag;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background-color: var(--icon-btn-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--app-white);
-  padding: 0;
-}
-
-.icon-btn:hover {
-  background-color: var(--icon-btn-hover);
-}
-
-.icon-btn svg {
-  /* Targets SVG elements that are direct children of .icon-btn
-     This is a descendant selector: .parent .child { } */
-  width: 24px;
-  height: 24px;
-}
-
-/* ─────────────────────────────────────────
-   MAIN CONTENT AREA
-   Right side of App-body — shows the selected tracker's cards
-───────────────────────────────────────── */
 
 .App-content {
   flex: 1;
   min-height: 0;
-  overflow-y: hidden;   /* was: overflow: hidden */
-  overflow-x: hidden; /* keep horizontal clipped, just allow vertical scroll */
-  display: flex;
-  flex-direction: column;
-  
-}
-
-.tracker-view {
-  /* Wrapper for the tracker title/progress header + card grid
-     height: 100% fills the full App-content height
-     overflow: hidden clips anything that would overflow */
-  display: flex;
-  flex-direction: column;
-  padding: 8px 0 0 0;
-  height: 100%;
-}
-
-.tracker-header {
-  /* Contains the tracker title and "X / Y cards collected" text
-     align-items: center centers both horizontally */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 14px;
-  gap: 4px;
-}
-
-.tracker-title {
-  color: var(--app-white);
-  font-size: 22px;
-  font-weight: 600; /* semibold */
-  margin: 0; /* remove default browser margin on h2 elements */
-}
-
-.tracker-progress {
-  color: var(--app-white);
-  font-size: 13px;
-  margin: 0;
-}
-
-.tracker-empty {
-  /* Shown when no tracker is selected OR cards are loading
-     height: 100% + flex centering puts the message in the dead center of the content area */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--app-white);
-  font-size: 14px;
-}
-
-/* ─────────────────────────────────────────
-   CARD GRID
-   The responsive grid of TCG cards
-───────────────────────────────────────── */
-
-.card-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  border-bottom: 10px solid var(--app-bg);
-  /* CSS Grid is different from Flexbox:
-     Flexbox = 1 dimensional (row OR column)
-     Grid = 2 dimensional (rows AND columns simultaneously)
-     
-     repeat(auto-fill, minmax(120px, 1fr)) means:
-     - auto-fill: fit as many columns as possible
-     - minmax(120px, 1fr): each column is minimum 120px, maximum 1 fraction of available space
-     - Result: responsive grid that reflows automatically when window resizes */
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 40px;       /* space between grid cells (both row and column gap) */
-  overflow-y:auto; /* only the card grid scrolls, not the whole page */
+  overflow-y: hidden;
   overflow-x: hidden;
-  padding: 24px 100px 24px 66px;
-  -webkit-user-select: none;
-  /* padding: top right bottom left
-     200px bottom clears the floating footer + Windows taskbar
-     120px right stops cards from touching the scrollbar */
-}
-
-.card-item {
-  aspect-ratio: 2/3;
-  color: var(--app-white);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 3px;
-  gap: 2px;
-}
-
-.card-item:hover {
-  border-color: var(--app-border-bright); /* border brightens on hover */
-}
-
-.card-img {
-  /* The actual card image
-     width: 125% intentionally overflows slightly for a fuller look
-     object-fit: contain scales the image to fit without cropping or stretching */
-    height:100%;
-  width: 100%;
-  flex: 1;          /* takes up all remaining vertical space in the card */
-  object-fit: contain;
-  border-radius: 3px;
-    cursor: pointer;
-}
-
-.card-name {
-  font-size: 15px;
-  color: var(--app-white);
-  text-align: center;
-  white-space: nowrap;  /* prevents text from wrapping to a second line */
-  overflow: hidden;     /* clips text that's too long */
-  width: 100%;
-  padding-bottom: 6px;
-}
-
-.card-rarity {
-  font-size: 7px;
-  color: var(--app-white-muted); /* muted color signals secondary information */
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  width: 100%;
-}
-
-.card-rarity[data-rarity="Special Illustration Rare"] {
-  /* Attribute selector — only matches elements where data-rarity equals this exact string
-     In JSX: <div className="card-rarity" data-rarity={card.rarity}>
-     This is how you style a specific element differently based on its data
-     without needing extra CSS classes */
-  text-align: left;
-  font-size: 6px;
-}
-
-.card-collect-btn {
-  /* The collect/collected toggle button at the bottom of each card */
-  width: 100%;
-  padding: 2px;
-  border-radius: 4px;
-  font-size: 9px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  /* transition: all means ANY property that changes will animate smoothly
-     More specific (e.g. transition: background-color 0.15s) is better for performance
-     but 'all' is fine here since this is a small element */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card-collect-btn-no {
-  /* Default uncollected state */
-  background-color: var(--app-surface);
-  color: var(--app-white-muted);
-  border: 1px solid var(--app-border);
-}
-
-.card-collect-btn-no:hover {
-  background-color: var(--app-surface-hover);
-  color: var(--app-white);
-}
-
-.card-collect-btn-yes {
-  /* Collected state — green tint to signal completion
-     rgba() with low opacity (0.15) gives a subtle tint without being too bright */
-  background-color: rgba(15, 110, 86, 0.15);
-  border: 1px solid rgba(29, 158, 117, 0.6);
-  color: rgb(29, 158, 117);
-}
-
-.card-collect-btn-yes:hover {
-  background-color: rgba(15, 110, 86, 0.25);
-}
-
-.card-modal-overlay {
-  /* position: fixed means it stays in place even when scrolling
-     inset: 0 is shorthand for top/right/bottom/left all = 0
-     so it covers the entire screen */
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.75); /* dark overlay, 75% opacity */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100; /* z-index controls stacking order — higher number = on top */
-  -webkit-app-region: no-drag;
-}
-
-.card-modal {
-  /* The centered card container
-     position: relative lets us position the close button inside it */
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  animation: modal-pop 0.15s ease;
-  /* animation runs the @keyframes below once on mount */
-}
-
-@keyframes modal-pop {
-  /* @keyframes defines an animation sequence
-     from = starting state, to = ending state
-     This creates a subtle scale-up effect when the modal appears */
-  from {
-    transform: scale(0.92);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-
-.card-modal-img {
-  /* Large centered card image
-     max-height: 70vh means it won't exceed 70% of the window height */
-  max-height: 70vh;
-  width: auto;
-  border-radius: 12px;
-}
-
-.card-modal-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.card-modal-name {
-  color: var(--app-white);
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.card-modal-rarity {
-  color: var(--app-white-muted);
-  font-size: 13px;
-}
-
-.card-modal-close {
-  /* X button positioned in the top right corner of the modal
-     position: absolute relative to .card-modal which has position: relative */
-  position: absolute;
-  top: -12px;
-  right: -12px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  background-color: var(--app-surface);
-  color: var(--app-white);
-  font-size: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card-modal-close:hover {
-  background-color: var(--window-btn-close-hover);
-}
-
-
-card-container {
-  border: 3px solid transparent;
-  border-radius: 12px;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.card-container.collected {
-  border-color: #ffd700; /* gold glow */
-  box-shadow: 0 0 12px 4px rgba(255, 215, 0, 0.5);
-}
-
-.collect-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.collect-btn.not-collected {
-  background-color: #ffffff;
-  color: #333;
-}
-
-.collect-btn.collected {
-  background-color: #4caf50; /* green */
-  color: #ffffff;
-  cursor: default;
-}
-
-
-.card-img-wrap.collected {
-  border-color: #ffd700;
-  box-shadow: 0 0 12px 7px rgba(255, 215, 0, 0.5);
-}
-
-
-.card-modal-img-wrap {
-  border: 3px solid transparent; /* was 3px */
-}
-
-
-.card-modal-img {
-  max-height: 70vh;
-  width: auto;
-  display: block;
-  /* remove border-radius from here — the wrapper handles it now */
-}
-
-.card-img-wrap {
-  width: fit-content;
-  height: fit-content;
-  flex: 1;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-}
-
-.card-search {
-  background-color: var(--app-bg);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  color: var(--app-white);
-  font-size: 13px;
-  padding: 4px 10px;
-  width: 200px;
-  outline: none;
-}
-
-.card-search::placeholder {
-  color: var(--app-white-muted);
-}
-
-.card-search:focus {
-  border-color: var(--app-border-bright);
-  background-color: rgba(255, 255, 255, 0.12);
-}
-
-.card-track-center {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  padding-bottom: 10px;
- border-bottom: 2px solid rgba(255, 255, 255, 0.18);
-  border-radius: 4px;
 }
 
 .browse-view {
@@ -486,9 +65,26 @@ card-container {
   overflow-y: auto;
 }
 
+.browse-view::-webkit-scrollbar {
+  width: 8px;
+}
+
+.browse-view::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.browse-view::-webkit-scrollbar-thumb {
+  background-color: var(--app-border, rgba(255, 255, 255, 0.2));
+  border-radius: 4px;
+}
+
+.browse-view::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-border-bright, rgba(255, 255, 255, 0.35));
+}
+
 .game-link-list {
   display: flex;
-  flex-direction:row;
+  flex-direction: row;
   gap: 20px;
   padding: 16px;
 }
@@ -506,6 +102,11 @@ card-container {
   background-color: var(--app-surface-hover);
 }
 
+.set-list-view {
+  width: 100%;
+  max-width: 900px;
+}
+
 .back-btn {
   background: none;
   border: none;
@@ -515,9 +116,12 @@ card-container {
   font-size: 15px;
 }
 
-.set-row {
-  color: var(--app-white-muted);
-  padding: 8px 0;
+.game-title {
+  /* Not in your old CSS — this class was referenced in the JSX but never styled */
+  color: var(--app-white);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 8px 0;
 }
 
 .set-list {
@@ -526,14 +130,10 @@ card-container {
   gap: 12px;
 }
 
-
-.set-list-view {
-  width: 100%;
-  max-width: 900px; /* optional — caps how wide it gets on big screens */
-}
-
 .set-row {
   display: flex;
+  color: var(--app-white-muted);
+  padding: 8px 0;
 }
 
 .set-row button {
@@ -542,32 +142,7 @@ card-container {
   text-align: center;
 }
 
-.card-grid::-webkit-scrollbar,
-.browse-view::-webkit-scrollbar {
-  width: 8px;
-}
-
-.card-grid::-webkit-scrollbar-track,
-.browse-view::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.card-grid::-webkit-scrollbar-thumb,
-.browse-view::-webkit-scrollbar-thumb {
-  background-color: var(--app-border, rgba(255, 255, 255, 0.2));
-  border-radius: 4px;
-}
-
-.card-grid::-webkit-scrollbar-thumb:hover,
-.browse-view::-webkit-scrollbar-thumb:hover {
-  background-color: var(--app-border-bright, rgba(255, 255, 255, 0.35));
-}
-
-
 .set-button {
-  /* The "+ New Tracker" button at the top of the sidebar
-     calc() lets you do math in CSS
-     calc(100% - 24px) = full width minus 12px margin on each side */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -583,47 +158,8 @@ card-container {
   cursor: pointer;
   -webkit-app-region: no-drag;
   transition: background-color 0.15s ease;
-  /* transition animates property changes smoothly
-     0.15s = animation duration, ease = starts fast then slows down */
 }
 
 .set-button:hover {
   background-color: var(--app-surface-hover);
-}
-
-.card-grid {
-  position: relative; /* required so the drag box & menu position correctly */
-}
-
-.card-item-selected {
-  outline: 2px solid #6366f1;
-  outline-offset: 2px;
-}
-
-.drag-select-box {
-  position: absolute;
-  background: rgba(99, 102, 241, 0.15);
-  border: 1px solid #6366f1;
-  pointer-events: none;
-}
-
-.card-context-menu {
-  position: absolute;
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  z-index: 10;
-  min-width: 190px;
-  overflow: hidden;
-}
-
-.card-context-menu-item {
-  padding: 8px 12px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.card-context-menu-item:hover {
-  background: #f4f4f5;
 }
