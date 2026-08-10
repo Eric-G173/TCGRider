@@ -1,0 +1,20 @@
+.card-context-menu {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 10;
+  min-width: 190px;
+  overflow: hidden;
+}
+
+.card-context-menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.card-context-menu-item:hover {
+  background: #f4f4f5;
+}
