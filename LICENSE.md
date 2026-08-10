@@ -1,4 +1,4 @@
-TCGRider Custom License
+# TCGRider Custom License
 Copyright (c) 2026 ERIC-G173
 
 Permission is granted, free of charge, to any person to:
@@ -19,7 +19,7 @@ or revenue-generating project
 This license does not restrict someone from making money showing
 off this software.
 
-Trademark Disclaimer
+# Trademark Disclaimer
 
 TCGRider is an independent, fan-made project and is not affiliated with,
 endorsed by, sponsored by, or officially connected to Pokémon, The Pokémon
