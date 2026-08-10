@@ -1,0 +1,97 @@
+.App-header {
+  display: flex;
+  align-items: center;
+  gap: 3.0rem;
+  background-color: var(--app-shell);
+  width: 100%;
+  border-bottom: 1px solid var(--app-border);
+  -webkit-app-region: drag;
+}
+
+
+.App-header button,
+.App-header input {
+  -webkit-app-region: no-drag;
+}
+
+.logo {
+  height: 3rem;
+  width: auto; /* auto width preserves the image's original aspect ratio */
+  filter: brightness(0) invert(1);
+}
+
+.AppName {
+  color: var(--app-white);
+  margin-top: 1.25rem; /* rem is relative to the root font size (usually 16px), so 1.25rem = 20px */
+}
+
+.window-controls {
+  margin-left: auto;
+  /* margin-left: auto is a flex trick — it pushes this element all the way to the right
+     by consuming all available horizontal space to its left */
+  display: flex;
+}
+
+.window-controls button {
+  -webkit-app-region: no-drag;
+  width: 46px;
+  height: 57px;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* centers content both horizontally and vertically */
+  background: transparent;
+  border: none;
+  color: var(--app-white);
+  font-size: 14px;
+  cursor: pointer; /* shows hand cursor on hover — signals clickable */
+  outline: none;   /* removes default browser focus ring */
+}
+
+.window-controls button:focus-visible {
+
+  outline: 2px solid var(--app-white);
+  outline-offset: -2px; /* negative offset draws the ring inside the button */
+}
+
+.window-controls button:hover {
+  background-color: var(--window-btn-hover);
+}
+
+.window-controls .close:hover {
+  background-color: var(--window-btn-close-hover);
+}
+
+.maximize-icon {
+  width: 9.5px;
+  height: 10px;
+  border: 1.5px solid var(--app-white);
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  margin-left: 12rem;
+}
+
+.header-search {
+  background-color: rgba(255, 255, 255, 0.08); /* very subtle white tint */
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-white);
+  font-size: 13px;
+  padding: 4px 10px; /* shorthand: top/bottom right/left */
+  width: 150px;
+  margin-left: 2rem;
+  -webkit-app-region: no-drag;
+  outline: none;
+}
+
+.header-search::placeholder {
+  color: var(--app-white-muted);
+}
+
+.header-search:focus {
+  border-color: var(--app-border-bright);
+  background-color: rgba(255, 255, 255, 0.12);
+}
