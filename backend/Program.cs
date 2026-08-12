@@ -100,13 +100,13 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
 });
 
 app.MapPost("/api/sync/{setId}", async (string setId) => {
-    await ApiSync.SyncPokemonSet(setId);
-    return Results.Ok(new { message = $"Synced set {setId}" });
+    bool synced = await ApiSync.SyncPokemonSet(setId);
+    return Results.Ok(new { message = synced ? $"Synced set {setId}" : $"Set {setId} already up to date" });
 });
 
 app.MapPost("/api/sync/onepiece/{setId}", async (string setId) => {
-    await ApiSync.SyncOnePieceSet(setId);
-    return Results.Ok(new { message = $"Synced One Piece set {setId}" });
+    bool synced = await ApiSync.SyncOnePieceSet(setId);
+    return Results.Ok(new { message = synced ? $"Synced One Piece set {setId}" : $"Set {setId} already up to date" });
 });
 
 Database.Initialize();
