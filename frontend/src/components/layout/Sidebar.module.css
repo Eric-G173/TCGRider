@@ -88,3 +88,16 @@
   border-color: var(--app-border-bright);
 }
 
+
+
+.new-btn[data-game="Pokémon"] {
+  border-left: 4px solid #FFCB05; /* Pokémon brand yellow */
+}
+
+.new-btn[data-game="One Piece"] {
+  border-left: 4px solid #D71920; /* One Piece brand red */
+}
+
+.new-btn[data-game="Topps"] {
+  border-left: 4px solid #9CA3AF; /* neutral gray fallback for games without a color yet */
+}
