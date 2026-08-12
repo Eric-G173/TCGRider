@@ -24,15 +24,16 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var app = builder.Build();
 app.UseCors("AllowReactApp");
 
-// shared client for the /api/sets/pokemon endpoint — created once, reused for every request
-var pokemonHttpClient = new HttpClient();
+// shared client reused across the /api/sets/* endpoints (renamed from
+// pokemonHttpClient now that it's also used for One Piece)
+var setsHttpClient = new HttpClient();
 
 app.MapGet("/ping", () => Results.Ok(new { status = "ok", message = "C# backend running" }));
 
 app.MapGet("/api/sets/pokemon", async () => {
     try
     {
-        var response = await pokemonHttpClient.GetFromJsonAsync<List<TcgdexSetBrief>>(
+        var response = await setsHttpClient.GetFromJsonAsync<List<TcgdexSetBrief>>(
             "https://api.tcgdex.net/v2/en/sets"
         );
 
@@ -45,6 +46,26 @@ app.MapGet("/api/sets/pokemon", async () => {
     catch (Exception ex)
     {
         Console.WriteLine($"TCGdex API error: {ex.GetType().Name} - {ex.Message}");
+        return Results.Ok(new List<object>());
+    }
+});
+
+app.MapGet("/api/sets/onepiece", async () => {
+    try
+    {
+        var response = await setsHttpClient.GetFromJsonAsync<List<OptcgSet>>(
+            "https://optcgapi.com/api/allSets/"
+        );
+
+        if (response == null)
+            return Results.Ok(new List<object>());
+
+        var sets = response.Select(s => new { name = s.SetName, setID = s.SetId }).ToList();
+        return Results.Ok(sets);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"OPTCG API error: {ex.GetType().Name} - {ex.Message}");
         return Results.Ok(new List<object>());
     }
 });
@@ -79,8 +100,13 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
 });
 
 app.MapPost("/api/sync/{setId}", async (string setId) => {
-    await ApiSync.SyncSet(setId);
+    await ApiSync.SyncPokemonSet(setId);
     return Results.Ok(new { message = $"Synced set {setId}" });
+});
+
+app.MapPost("/api/sync/onepiece/{setId}", async (string setId) => {
+    await ApiSync.SyncOnePieceSet(setId);
+    return Results.Ok(new { message = $"Synced One Piece set {setId}" });
 });
 
 Database.Initialize();

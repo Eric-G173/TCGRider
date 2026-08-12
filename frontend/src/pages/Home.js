@@ -14,12 +14,6 @@ function App() {
   const [selectedGame, setSelectedGame] = React.useState(null);
   const [availableSets, setAvailableSets] = React.useState([
     {
-      game: "One Piece",
-      sets: [
-        { name: "Romance Dawn", setID: "op01" },
-      ]
-    },
-    {
       game: "Topps",
       sets: [
         { name: "Match Attax", setID: "topps01" },
@@ -37,16 +31,20 @@ function App() {
     });
   }
 
-  async function syncAndAddSet(set) {
+  async function syncAndAddSet(set, game) {
     setSyncingSets(prev => new Set(prev).add(set.setID));
 
+    // Each game's card data lives behind a different sync endpoint —
+    // route based on which game group this set came from.
+    const endpoint = game === "One Piece"
+      ? `http://localhost:5000/api/sync/onepiece/${encodeURIComponent(set.setID)}`
+      : `http://localhost:5000/api/sync/${encodeURIComponent(set.setID)}`;
+
     try {
-      const res = await fetch(`http://localhost:5000/api/sync/${encodeURIComponent(set.setID)}`, {
-        method: 'POST'
-      });
+      const res = await fetch(endpoint, { method: 'POST' });
       if (!res.ok) throw new Error(`Sync failed: HTTP ${res.status}`);
 
-      addTracker({ name: set.name, setID: set.setID });
+      addTracker({ name: set.name, setID: set.setID, game });
     } catch (err) {
       console.error(`Failed to sync set ${set.setID}`, err);
     } finally {
@@ -78,6 +76,29 @@ function App() {
     }
 
     loadPokemonSets();
+    return () => { cancelled = true; };
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function loadOnePieceSets() {
+      try {
+        const res = await fetch("http://localhost:5000/api/sets/onepiece");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const sets = await res.json();
+
+        if (cancelled) return;
+
+        setAvailableSets(prev => {
+          const others = prev.filter(g => g.game !== "One Piece");
+          return [{ game: "One Piece", sets }, ...others];
+        });
+      } catch (err) {
+        console.error("Failed to load One Piece sets", err);
+      }
+    }
+
+    loadOnePieceSets();
     return () => { cancelled = true; };
   }, []);
 
@@ -121,7 +142,7 @@ function App() {
                           <div className={styles['set-row']} key={j}>
                             <button className={styles['set-button']}
                               disabled={isSyncing || isTracked}
-                              onClick={() => syncAndAddSet(set)}
+                              onClick={() => syncAndAddSet(set, selectedGame)}
                             >
                               {isSyncing ? `Syncing ${set.name}...` : set.name}
                             </button>
