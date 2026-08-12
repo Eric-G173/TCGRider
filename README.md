@@ -3,10 +3,29 @@
 A desktop app for tracking trading card game collections. Browse sets, view card details, and sync card data locally for fast, offline browsing.
 
 # Features
-- Browse trading card game sets (currently Pokémon, via the TCGdex API)
+
+
+https://github.com/user-attachments/assets/b6c0ce2c-c2a6-4318-ac48-99352a6b1e1e
+
+
+- Browse trading card game sets (currently Pokémon, One Piece, etc.)
 - View all cards in a set, including rarity and card images
 - Sync a set's card data into a local SQLite database with one click
 - Runs as a desktop app (Electron) with a React frontend and C# backend
+
+https://github.com/user-attachments/assets/2772eb58-345a-4e0e-9df4-85d46d3b137b
+
+- Keep track of your collection with card collection features
+
+
+https://github.com/user-attachments/assets/8553a56a-622b-45ff-bf0d-a6602ed41456
+
+
+
+
+
+
+
 # Tech stack
 - **Backend:** C# (ASP.NET Core, Minimal APIs), SQLite
 - **Frontend:** React, Electron
