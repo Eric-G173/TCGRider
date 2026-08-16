@@ -34,7 +34,7 @@ function CardItem({ card, isSelected, isCollected, onToggleCollected, onOpen, ca
           onToggleCollected(card.id);
         }}
       >
-        {isCollected ? '✓ Collected' : 'Collect'}
+        {isCollected ? 'Collected' : 'Collect'}
       </button>
     </div>
   );
