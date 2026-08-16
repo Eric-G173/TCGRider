@@ -2,6 +2,8 @@ import React from 'react';
 import styles from './CardItem.module.css';
 
 function CardItem({ card, isSelected, isCollected, onToggleCollected, onOpen, cardRef }) {
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+
   return (
     <div
       className={`${styles['card-item']} ${isSelected ? styles['card-item-selected'] : ''}`}
@@ -11,14 +13,16 @@ function CardItem({ card, isSelected, isCollected, onToggleCollected, onOpen, ca
       <div className={styles['card-name']}>{card.name}</div>
 
       <div
-        className={`${styles['card-img-wrap']} ${isCollected ? styles.collected : ''}`}
+        className={`${styles['card-img-wrap']} ${isCollected ? styles.collected : ''} ${!imageLoaded ? styles.loading : ''}`}
         onClick={onOpen}
       >
         <img
-          className={styles['card-img']}
+          className={`${styles['card-img']} ${imageLoaded ? styles.loaded : ''}`}
           src={card.imageUrl}
           alt={card.name}
           loading="lazy"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageLoaded(true)}
         />
       </div>
 

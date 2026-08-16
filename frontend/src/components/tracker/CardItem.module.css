@@ -37,6 +37,16 @@
 }
 
 
+.card-img-wrap.loading {
+  background-color: var(--app-shell);
+  animation: card-img-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes card-img-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
 .card-img {
   height: 100%;
   width: 100%;
@@ -44,6 +54,12 @@
   object-fit: contain;
   border-radius: 3px;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.card-img.loaded {
+  opacity: 1;
 }
 
 .card-collect-btn {
