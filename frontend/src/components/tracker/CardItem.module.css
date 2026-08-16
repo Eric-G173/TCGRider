@@ -36,10 +36,6 @@
   display: flex;
 }
 
-.card-img-wrap.collected {
-  border-color: #ffd700;
-  box-shadow: 0 0 12px 7px rgba(255, 215, 0, 0.5);
-}
 
 .card-img {
   height: 100%;

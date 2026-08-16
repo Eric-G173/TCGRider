@@ -13,11 +13,6 @@
   border: 3px solid transparent;
 }
 
-.card-modal-img-wrap.collected {
-  border-color: #ffd700;
-  box-shadow: 0 0 12px 7px rgba(255, 215, 0, 0.5);
-}
-
 .card-modal-img {
   max-height: 70vh;
   width: auto;

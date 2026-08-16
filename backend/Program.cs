@@ -28,19 +28,87 @@ app.UseCors("AllowReactApp");
 // pokemonHttpClient now that it's also used for One Piece)
 var setsHttpClient = new HttpClient();
 
+// Sets get marked here (total = 0) once a real sync attempt confirms they
+// have no actual card data — TCGdex/OPTCG's own listing metadata isn't
+// reliable enough to catch this upfront, so this filters based on what's
+// actually been verified rather than what the API claims.
+HashSet<string> GetKnownEmptySetIds()
+{
+    var ids = new HashSet<string>();
+    using var connection = Database.GetConnection();
+    var command = connection.CreateCommand();
+    command.CommandText = "SELECT id FROM Sets WHERE total = 0";
+    using var reader = command.ExecuteReader();
+    while (reader.Read())
+        ids.Add(reader.GetString(0));
+    return ids;
+}
+
 app.MapGet("/ping", () => Results.Ok(new { status = "ok", message = "C# backend running" }));
+
+// Known chronological order of TCG eras — TCGdex's own series listing isn't
+// guaranteed to come back in release order, so sets are sorted using this
+// reference list instead of trusting API return order.
+var pokemonSeriesOrder = new List<string> {
+    "Base", "Gym", "Neo", "Legendary", "e-Card", "EX", "Diamond & Pearl",
+    "Platinum", "HeartGold", "Black & White", "XY", "Sun & Moon",
+    "Sword & Shield", "Scarlet & Violet"
+};
 
 app.MapGet("/api/sets/pokemon", async () => {
     try
     {
-        var response = await setsHttpClient.GetFromJsonAsync<List<TcgdexSetBrief>>(
-            "https://api.tcgdex.net/v2/en/sets"
+        var seriesList = await setsHttpClient.GetFromJsonAsync<List<TcgdexSeriesBrief>>(
+            "https://api.tcgdex.net/v2/en/series"
         );
 
-        if (response == null)
+        if (seriesList == null)
             return Results.Ok(new List<object>());
 
-        var sets = response.Select(s => new { name = s.Name, setID = s.Id }).ToList();
+        // Fetch each series' full set list in parallel — a fixed, small number
+        // of calls (one per era, not per set), so this stays cheap.
+        var seriesDetailTasks = seriesList.Select(async s => {
+            try
+            {
+                return await setsHttpClient.GetFromJsonAsync<TcgdexSeriesFull>(
+                    $"https://api.tcgdex.net/v2/en/series/{s.Id}"
+                );
+            }
+            catch
+            {
+                return null; // one bad series shouldn't take down the whole list
+            }
+        });
+        var seriesDetails = await Task.WhenAll(seriesDetailTasks);
+
+        var orderedSeries = seriesDetails
+            .Where(s => s != null)
+            .OrderBy(s => {
+                int idx = pokemonSeriesOrder.FindIndex(era =>
+                    s!.Name.Contains(era, StringComparison.OrdinalIgnoreCase));
+                return idx == -1 ? int.MaxValue : idx; // unrecognized series sort last, not dropped
+            });
+
+        var knownEmpty = GetKnownEmptySetIds();
+
+        var sets = orderedSeries
+            .SelectMany(s => (s!.Sets ?? new List<TcgdexSetBrief>())
+                .Where(set => (set.CardCount?.Total ?? 0) > 0) // drop sets with no actual cards
+                // Secondary sort: TCGdex ids within a series typically follow a
+                // numbered pattern (base1, base2, base3 / neo1..neo4), so pulling
+                // that number out approximates release order without fetching
+                // every set's full releaseDate individually. Ids with no number
+                // (promos, one-off special releases) sort to the end instead of
+                // landing randomly in the middle.
+                .OrderBy(set => {
+                    var match = System.Text.RegularExpressions.Regex.Match(set.Id, @"\d+");
+                    return match.Success ? int.Parse(match.Value) : int.MaxValue;
+                })
+            )
+            .Where(set => !knownEmpty.Contains(set.Id))
+            .Select(set => new { name = set.Name, setID = set.Id })
+            .ToList();
+
         return Results.Ok(sets);
     }
     catch (Exception ex)
@@ -60,7 +128,12 @@ app.MapGet("/api/sets/onepiece", async () => {
         if (response == null)
             return Results.Ok(new List<object>());
 
-        var sets = response.Select(s => new { name = s.SetName, setID = s.SetId }).ToList();
+        var knownEmpty = GetKnownEmptySetIds();
+
+        var sets = response
+            .Where(s => !knownEmpty.Contains(s.SetId))
+            .Select(s => new { name = s.SetName, setID = s.SetId })
+            .ToList();
         return Results.Ok(sets);
     }
     catch (Exception ex)
@@ -100,13 +173,19 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
 });
 
 app.MapPost("/api/sync/{setId}", async (string setId) => {
-    bool synced = await ApiSync.SyncPokemonSet(setId);
-    return Results.Ok(new { message = synced ? $"Synced set {setId}" : $"Set {setId} already up to date" });
+    bool hasCards = await ApiSync.SyncPokemonSet(setId);
+    return Results.Ok(new {
+        hasCards,
+        message = hasCards ? $"Set {setId} ready" : $"Set {setId} has no card data available"
+    });
 });
 
 app.MapPost("/api/sync/onepiece/{setId}", async (string setId) => {
-    bool synced = await ApiSync.SyncOnePieceSet(setId);
-    return Results.Ok(new { message = synced ? $"Synced One Piece set {setId}" : $"Set {setId} already up to date" });
+    bool hasCards = await ApiSync.SyncOnePieceSet(setId);
+    return Results.Ok(new {
+        hasCards,
+        message = hasCards ? $"Synced One Piece set {setId}" : $"Set {setId} has no card data available"
+    });
 });
 
 Database.Initialize();

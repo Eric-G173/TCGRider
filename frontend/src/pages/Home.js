@@ -44,6 +44,12 @@ function App() {
       const res = await fetch(endpoint, { method: 'POST' });
       if (!res.ok) throw new Error(`Sync failed: HTTP ${res.status}`);
 
+      const data = await res.json();
+      if (!data.hasCards) {
+        console.warn(`Set ${set.setID} has no card data — not adding as tracker`);
+        return;
+      }
+
       addTracker({ name: set.name, setID: set.setID, game });
     } catch (err) {
       console.error(`Failed to sync set ${set.setID}`, err);

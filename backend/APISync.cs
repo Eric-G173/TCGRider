@@ -1,33 +1,59 @@
 using System.Net.Http.Json;
-using Microsoft.Data.Sqlite;
 using System.Text.Json.Serialization;
+using Microsoft.Data.Sqlite;
 using System.IO;
 
 public class ApiSync
 {
     private static readonly HttpClient client = new HttpClient();
 
-// Checks if set already exists in local DB, then uses it
+    // Checked before either sync method makes any network calls at all —
+    // if the set's already in the DB with real cards, there's no reason to
+    // hit the API. A set with total = 0 is treated as NOT synced, so a
+    // manual retry is still possible if upstream data ever gets fixed.
     private static bool SetAlreadySynced(string setId)
     {
         using var connection = Database.GetConnection();
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1 FROM Sets WHERE id = $id LIMIT 1";
+        command.CommandText = "SELECT total FROM Sets WHERE id = $id LIMIT 1";
         command.Parameters.AddWithValue("$id", setId);
         using var reader = command.ExecuteReader();
-        return reader.Read();
+        if (!reader.Read()) return false;
+        return reader.GetInt32(0) > 0;
     }
 
+    // Records that a set was actually attempted and confirmed to have no
+    // cards — this is what lets /api/sets/* permanently filter it out of
+    // the browse list going forward, since TCGdex's own cardCount metadata
+    // isn't reliable enough on its own to catch cases like this.
+    private static void MarkSetAsEmpty(string setId, string name)
+    {
+        using var connection = Database.GetConnection();
+        var command = connection.CreateCommand();
+        command.CommandText = @"
+            INSERT OR IGNORE INTO Sets (id, name, total, last_synced)
+            VALUES ($id, $name, 0, $lastSynced)
+        ";
+        command.Parameters.AddWithValue("$id", setId);
+        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$lastSynced", DateTime.UtcNow.ToString("o"));
+        command.ExecuteNonQuery();
+    }
 
-//The below functions will run if the set is not in the database already 
+    // ─────────────────────────────────────────
+    // POKÉMON (TCGdex)
+    // ─────────────────────────────────────────
 
-//Pokemon function
+    // Returns true if the set has real card data available (whether it was
+    // just freshly synced or already in the DB), false if TCGdex has no
+    // cards for it — the frontend uses this to decide whether to add it as
+    // a tracker at all.
     public static async Task<bool> SyncPokemonSet(string setId)
     {
         if (SetAlreadySynced(setId))
         {
             Console.WriteLine($"Set {setId} already synced — skipping API fetch");
-            return false;
+            return true;
         }
 
         Console.WriteLine($"Fetching cards for set: {setId}");
@@ -36,9 +62,10 @@ public class ApiSync
             $"https://api.tcgdex.net/v2/en/sets/{setId}"
         );
 
-        if (set?.Cards == null)
+        if (set?.Cards == null || set.Cards.Count == 0)
         {
-            Console.WriteLine("No data returned from API");
+            Console.WriteLine($"Set {setId} has no card data available — marking as empty");
+            MarkSetAsEmpty(setId, set?.Name ?? setId);
             return false;
         }
 
@@ -94,14 +121,16 @@ public class ApiSync
         return true;
     }
 
+    // ─────────────────────────────────────────
+    // ONE PIECE (OPTCG API)
+    // ─────────────────────────────────────────
 
-//One piece function
     public static async Task<bool> SyncOnePieceSet(string setId)
     {
         if (SetAlreadySynced(setId))
         {
             Console.WriteLine($"Set {setId} already synced — skipping API fetch");
-            return false;
+            return true;
         }
 
         Console.WriteLine($"Fetching One Piece cards for set: {setId}");
@@ -112,7 +141,8 @@ public class ApiSync
 
         if (cards == null || cards.Count == 0)
         {
-            Console.WriteLine("No data returned from OPTCG API");
+            Console.WriteLine($"Set {setId} has no card data available — marking as empty");
+            MarkSetAsEmpty(setId, setId); // OPTCG's set list endpoint doesn't return a name on empty results
             return false;
         }
 
@@ -160,7 +190,9 @@ public class ApiSync
     }
 }
 
-// Pokemon models
+// ─────────────────────────────────────────
+// TCGdex (Pokémon) models
+// ─────────────────────────────────────────
 
 public class TcgdexSet
 {
@@ -183,15 +215,35 @@ public class TcgdexCardFull
     public string? Rarity { get; set; }
 }
 
+public class TcgdexCardCount
+{
+    public int Official { get; set; }
+    public int Total { get; set; }
+}
+
 public class TcgdexSetBrief
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public TcgdexCardCount? CardCount { get; set; }
+}
+
+public class TcgdexSeriesBrief
 {
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
 }
 
+public class TcgdexSeriesFull
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public List<TcgdexSetBrief>? Sets { get; set; }
+}
 
-// One Piece models
-
+// ─────────────────────────────────────────
+// OPTCG API (One Piece) models
+// ─────────────────────────────────────────
 
 public class OptcgSet
 {
