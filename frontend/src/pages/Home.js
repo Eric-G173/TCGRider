@@ -108,6 +108,7 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
+  
   return (
     <div className={styles.App}>
       <TopBar search={search} setSearch={setSearch} />
