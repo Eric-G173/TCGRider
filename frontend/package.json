@@ -19,7 +19,7 @@
     "concurrently": "^8.2.2",
     "electron": "^43.4.0",
     "electron-builder": "^26.15.2",
-    "wait-on": "^7.0.0"
+    "wait-on": "^9.1.0"
   },
  "scripts": {
     "start": "react-scripts start",
