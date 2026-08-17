@@ -16,7 +16,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
+    "concurrently": "^10.0.4",
     "electron": "^43.4.0",
     "electron-builder": "^26.15.2",
     "wait-on": "^7.0.0"
