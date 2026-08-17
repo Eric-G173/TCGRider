@@ -40,6 +40,12 @@ public class ApiSync
         command.ExecuteNonQuery();
     }
 
+public static int ExtractSetNumber(string setId)
+{
+    var match = System.Text.RegularExpressions.Regex.Match(setId, @"\d+");
+    return match.Success ? int.Parse(match.Value) : int.MaxValue;
+}
+
     // ─────────────────────────────────────────
     // POKÉMON (TCGdex)
     // ─────────────────────────────────────────
