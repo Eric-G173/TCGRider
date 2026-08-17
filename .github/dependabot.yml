@@ -3,6 +3,7 @@ updates:
   # Frontend (React/Electron) dependencies
   - package-ecosystem: "npm"
     directory: "/frontend"
+    target-branch: "dev"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -10,6 +11,7 @@ updates:
   # Backend (.NET) dependencies
   - package-ecosystem: "nuget"
     directory: "/backend"
+    target-branch: "dev"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -17,5 +19,6 @@ updates:
   # Keep the GitHub Actions themselves (checkout, setup-dotnet, setup-node) up to date too
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "dev"
     schedule:
       interval: "weekly"
