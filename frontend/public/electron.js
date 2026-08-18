@@ -34,7 +34,14 @@ function createWindow() {
 
   ipcMain.on('window-close', () => win.close());
 
-  win.loadURL('http://localhost:3000')
+  // app.isPackaged is Electron's own built-in check — true when running as
+  // a real packaged app, false when running via `npm run electron` in dev.
+  if (app.isPackaged) {
+    win.loadFile(path.join(__dirname, '..', 'build', 'index.html'));
+  } else {
+    win.loadURL('http://localhost:3000');
+  }
+
   win.setMenuBarVisibility(false)
 }
 
