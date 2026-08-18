@@ -10,7 +10,15 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:3000")
+        var allowedOrigins = new List<string> { "http://localhost:3000" };
+
+        // Set this on Render once your frontend's real URL is known —
+        // avoids needing another code deploy just to update CORS.
+        var deployedOrigin = Environment.GetEnvironmentVariable("FRONTEND_URL");
+        if (!string.IsNullOrEmpty(deployedOrigin))
+            allowedOrigins.Add(deployedOrigin);
+
+        policy.WithOrigins(allowedOrigins.ToArray())
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
@@ -94,16 +102,7 @@ app.MapGet("/api/sets/pokemon", async () => {
         var sets = orderedSeries
             .SelectMany(s => (s!.Sets ?? new List<TcgdexSetBrief>())
                 .Where(set => (set.CardCount?.Total ?? 0) > 0) // drop sets with no actual cards
-                // Secondary sort: TCGdex ids within a series typically follow a
-                // numbered pattern (base1, base2, base3 / neo1..neo4), so pulling
-                // that number out approximates release order without fetching
-                // every set's full releaseDate individually. Ids with no number
-                // (promos, one-off special releases) sort to the end instead of
-                // landing randomly in the middle.
-                .OrderBy(set => {
-                    var match = System.Text.RegularExpressions.Regex.Match(set.Id, @"\d+");
-                    return match.Success ? int.Parse(match.Value) : int.MaxValue;
-                })
+                .OrderBy(set => ApiSync.ExtractSetNumber(set.Id))
             )
             .Where(set => !knownEmpty.Contains(set.Id))
             .Select(set => new { name = set.Name, setID = set.Id })
@@ -189,4 +188,6 @@ app.MapPost("/api/sync/onepiece/{setId}", async (string setId) => {
 });
 
 Database.Initialize();
-app.Run("http://localhost:5000");
+
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+app.Run($"http://0.0.0.0:{port}");

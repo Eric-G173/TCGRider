@@ -4,6 +4,7 @@ import useCardDragSelect from '../../hooks/useCardDragSelect';
 import CardItem from './CardItem';
 import CardContextMenu from './CardContextMenu';
 import CardModal from './CardModal';
+import { API_BASE_URL } from '../../config';
 
 function CardGrid({ tracker }) {
   const [cardSearch, setCardSearch] = React.useState('');
@@ -64,7 +65,7 @@ function CardGrid({ tracker }) {
     setLoadingCards(true);
     setCards([]);
 
-    fetch(`http://localhost:5000/api/cards/${tracker.setID}`)
+    fetch(`${API_BASE_URL}/api/cards/${tracker.setID}`)
       .then(res => res.json())
       .then(data => {
         setCards(data.cards);

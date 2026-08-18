@@ -4,6 +4,7 @@ import TopBar from '../components/layout/TopBar';
 import Sidebar from '../components/layout/Sidebar';
 import DefaultGrid from '../components/tracker/DefaultGrid';
 import CardGrid from '../components/tracker/CardGrid';
+import { API_BASE_URL } from '../config';
 
 function App() {
   const [search, setSearch] = React.useState('');
@@ -37,8 +38,8 @@ function App() {
     // Each game's card data lives behind a different sync endpoint —
     // route based on which game group this set came from.
     const endpoint = game === "One Piece"
-      ? `http://localhost:5000/api/sync/onepiece/${encodeURIComponent(set.setID)}`
-      : `http://localhost:5000/api/sync/${encodeURIComponent(set.setID)}`;
+      ? `${API_BASE_URL}/api/sync/onepiece/${encodeURIComponent(set.setID)}`
+      : `${API_BASE_URL}/api/sync/${encodeURIComponent(set.setID)}`;
 
     try {
       const res = await fetch(endpoint, { method: 'POST' });
@@ -66,7 +67,7 @@ function App() {
     let cancelled = false;
     async function loadPokemonSets() {
       try {
-        const res = await fetch("http://localhost:5000/api/sets/pokemon");
+        const res = await fetch(`${API_BASE_URL}/api/sets/pokemon`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const sets = await res.json();
 
@@ -89,7 +90,7 @@ function App() {
     let cancelled = false;
     async function loadOnePieceSets() {
       try {
-        const res = await fetch("http://localhost:5000/api/sets/onepiece");
+        const res = await fetch(`${API_BASE_URL}/api/sets/onepiece`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const sets = await res.json();
 
@@ -108,7 +109,6 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  
   return (
     <div className={styles.App}>
       <TopBar search={search} setSearch={setSearch} />
