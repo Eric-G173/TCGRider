@@ -14,6 +14,7 @@ function TaskBtn({ name, game, onClick, isSelected }) {
 }
 
 function Sidebar({ setView, filteredTrackers, selectedTracker, setSelectedTracker }) {
+  const [isEditing, setIsEditing] = React.useState(false);
   return (
     <aside className={styles['App-sidebar']}>
       <button className={styles['new-tracker']} onClick={() => setView('browse')}>
@@ -34,6 +35,11 @@ function Sidebar({ setView, filteredTrackers, selectedTracker, setSelectedTracke
           }}
         />
       ))}
+          <button
+          className={styles['edit-trackers']} 
+          onClick = {() => setIsEditing(prev => !prev)}>
+    {isEditing ? 'Done' : 'Edit'}
+      </button>
     </aside>
   )
 }
