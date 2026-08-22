@@ -5,18 +5,26 @@ import CardItem from './CardItem';
 import CardContextMenu from './CardContextMenu';
 import CardModal from './CardModal';
 import { API_BASE_URL } from '../../config';
+import filterCards from './filterCards';
 
 function CardGrid({ tracker }) {
   const [cardSearch, setCardSearch] = React.useState('');
+  const [rarityFilter, setRarityFilter] = React.useState('All');
+  const [collectedFilter, setCollectedFilter] = React.useState('All');
   const [cards, setCards] = React.useState([]);
   const [loadingCards, setLoadingCards] = React.useState(false);
   const [hasMissingImages, setHasMissingImages] = React.useState(false);
   const [collectedCards, setCollectedCards] = React.useState(new Set());
   const [selectedCard, setSelectedCard] = React.useState(null);
 
-  const filteredCards = cards.filter(card =>
-    card.name.toLowerCase().includes(cardSearch.toLowerCase())
-  );
+  const rarityOptions = ['All', ...new Set(cards.map(c => c.rarity).filter(Boolean))];
+
+  const filteredCards = filterCards(cards, {
+    search: cardSearch,
+    rarity: rarityFilter,
+    collectedFilter,
+    collectedIds: collectedCards,
+  });
 
   const collectedCount = cards.filter(card => collectedCards.has(card.id)).length;
 
@@ -102,6 +110,24 @@ function CardGrid({ tracker }) {
           value={cardSearch}
           onChange={(e) => setCardSearch(e.target.value)}
         />
+        <select
+          className={styles['card-filter-select']}
+          value={rarityFilter}
+          onChange={(e) => setRarityFilter(e.target.value)}
+        >
+          {rarityOptions.map(option => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+        <select
+          className={styles['card-filter-select']}
+          value={collectedFilter}
+          onChange={(e) => setCollectedFilter(e.target.value)}
+        >
+          <option value="All">All</option>
+          <option value="Collected">Collected</option>
+          <option value="Uncollected">Uncollected</option>
+        </select>
       </div>
 
       {loadingCards ? (
