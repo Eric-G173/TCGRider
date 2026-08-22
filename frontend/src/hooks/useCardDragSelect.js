@@ -100,15 +100,29 @@ function useCardDragSelect(filteredCards) {
   }, [recomputeDragSelection]);
 
   function handleCardGridContextMenu(e) {
-    e.preventDefault();
-    if (selectedCardIds.size === 0) return;
-    const grid = cardGridRef.current;
-    const rect = grid.getBoundingClientRect();
-    setCardContextMenu({
-      x: e.clientX - rect.left + grid.scrollLeft,
-      y: e.clientY - rect.top + grid.scrollTop,
-    });
+  e.preventDefault();
+  if (selectedCardIds.size === 0) return;
+  const grid = cardGridRef.current;
+  const rect = grid.getBoundingClientRect();
+
+  const MENU_WIDTH = 200;
+  const MENU_HEIGHT = 110;
+
+  let x = e.clientX - rect.left + grid.scrollLeft;
+  let y = e.clientY - rect.top + grid.scrollTop;
+
+  if (x + MENU_WIDTH > grid.scrollLeft + grid.clientWidth) {
+    x -= MENU_WIDTH;
   }
+  if (y + MENU_HEIGHT > grid.scrollTop + grid.clientHeight) {
+    y -= MENU_HEIGHT;
+  }
+
+  setCardContextMenu({
+    x: Math.max(x, grid.scrollLeft),
+    y: Math.max(y, grid.scrollTop),
+  });
+}
 
   React.useEffect(() => {
     window.addEventListener('mousemove', handleDragMouseMove);
