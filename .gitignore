@@ -9,3 +9,5 @@ obj/
 
 backend/tcgrider.sqbpro
 backend/tcgrider.db
+
+agent_transcript.json

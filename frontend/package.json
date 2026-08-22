@@ -24,6 +24,7 @@
   "overrides": {
   "@tootallnate/once": "2.0.1",
   "underscore": "1.13.8"
+
 },
  "scripts": {
     "start": "react-scripts start",
