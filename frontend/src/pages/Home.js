@@ -14,12 +14,7 @@ function App() {
   const [trackers, setTrackers] = React.useState([]);
   const [selectedGame, setSelectedGame] = React.useState(null);
   const [availableSets, setAvailableSets] = React.useState([
-    {
-      game: "Topps",
-      sets: [
-        { name: "Match Attax", setID: "topps01" },
-      ]
-    }]);
+   ]);
 
   const filteredTrackers = trackers.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())
