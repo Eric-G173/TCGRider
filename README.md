@@ -2,6 +2,8 @@
 
 A desktop app for tracking trading card game collections. Browse sets, view card details, and sync card data locally for fast, offline browsing.
 
+**Live Demo:** https://tcgrider.onrender.com/
+
 # Features
 
 
