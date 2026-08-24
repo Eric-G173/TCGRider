@@ -98,6 +98,16 @@ html, body {
   border: 1px solid var(--app-border);
 }
 
+.game-link.loading {
+  background-color: var(--app-shell);
+  animation: game-link-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes game-link-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
 .game-link:hover {
   background-color: var(--app-surface-hover);
 }
@@ -163,3 +173,6 @@ html, body {
 .set-button:hover {
   background-color: var(--app-surface-hover);
 }
+
+
+

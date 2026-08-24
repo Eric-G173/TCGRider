@@ -13,6 +13,7 @@ function App() {
   const [syncingSets, setSyncingSets] = React.useState(new Set());
   const [trackers, setTrackers] = React.useState([]);
   const [selectedGame, setSelectedGame] = React.useState(null);
+  const [gameTrackerLoaded, setGameTrackerLoaded] = React.useState(false);
   const [availableSets, setAvailableSets] = React.useState([
    ]);
 
@@ -58,51 +59,40 @@ function App() {
     }
   }
 
-  React.useEffect(() => {
-    let cancelled = false;
+
     async function loadPokemonSets() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/sets/pokemon`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const sets = await res.json();
+  const res = await fetch(`${API_BASE_URL}/api/sets/pokemon`);
+  const sets = await res.json();
 
-        if (cancelled) return;
+  setAvailableSets(prev => {
+    const others = prev.filter(g => g.game !== "Pokémon");
+    return [{ game: "Pokémon", sets }, ...others];
+  });
+}
 
-        setAvailableSets(prev => {
-          const others = prev.filter(g => g.game !== "Pokémon");
-          return [{ game: "Pokémon", sets }, ...others];
-        });
-      } catch (err) {
-        console.error("Failed to load Pokémon sets", err);
-      }
-    }
+async function loadOnePieceSets() {
+  const res = await fetch(`${API_BASE_URL}/api/sets/onepiece`);
+  const sets = await res.json();
 
-    loadPokemonSets();
-    return () => { cancelled = true; };
-  }, []);
+  setAvailableSets(prev => {
+    const others = prev.filter(g => g.game !== "One Piece");
+    return [{ game: "One Piece", sets }, ...others];
+  });
+}
+
 
   React.useEffect(() => {
-    let cancelled = false;
-    async function loadOnePieceSets() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/sets/onepiece`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const sets = await res.json();
+  async function loadAll() {
+    await Promise.all([
+      loadPokemonSets(),
+      loadOnePieceSets()
+    ]);
 
-        if (cancelled) return;
+    setGameTrackerLoaded(true); 
+  }
 
-        setAvailableSets(prev => {
-          const others = prev.filter(g => g.game !== "One Piece");
-          return [{ game: "One Piece", sets }, ...others];
-        });
-      } catch (err) {
-        console.error("Failed to load One Piece sets", err);
-      }
-    }
-
-    loadOnePieceSets();
-    return () => { cancelled = true; };
-  }, []);
+  loadAll();
+}, []);
 
   return (
     <div className={styles.App}>
@@ -117,13 +107,12 @@ function App() {
           ) : view === 'browse' ? (
             <div className={styles['browse-view']}>
               {selectedGame === null ? (
-                <div className={styles['game-link-list']}>
+                <div className={styles['game-link-list']} >
                   {availableSets.map((group, i) => (
                     <div
-                      className={styles['game-link']}
+                      className={`${styles['game-link']} ${!gameTrackerLoaded ? styles.loading : ''}`}
                       key={i}
-                      onClick={() => setSelectedGame(group.game)}
-                    >
+                      onClick={() => setSelectedGame(group.game)}>
                       {group.game}
                     </div>
                   ))}
