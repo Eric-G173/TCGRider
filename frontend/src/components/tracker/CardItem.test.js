@@ -34,7 +34,7 @@ test('shows "Collect" when not collected', () => {
   expect(screen.getByText('Collect')).toBeInTheDocument();
 });
 
-test('shows "✓ Collected" when collected', () => {
+test('shows "Collected" when collected', () => {
   renderCardItem({ isCollected: true });
   expect(screen.getByText('Collected')).toBeInTheDocument();
 });
