@@ -49,4 +49,5 @@ test('clicking a tracker selects it by index and switches to tracker view', () =
 
   expect(setSelectedTracker).toHaveBeenCalledWith(1);
   expect(setView).toHaveBeenCalledWith('tracker');
-});
+}); 
+//
