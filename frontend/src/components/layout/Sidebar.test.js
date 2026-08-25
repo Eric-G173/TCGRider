@@ -13,6 +13,7 @@ function renderSidebar(overrides = {}) {
     filteredTrackers: [],
     selectedTracker: null,
     setSelectedTracker: () => {},
+    setTrackers: () => {},
     ...overrides,
   };
   return render(<Sidebar {...props} />);
