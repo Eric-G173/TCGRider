@@ -101,3 +101,19 @@
 .new-btn[data-game="Topps"] {
   border-left: 4px solid #9CA3AF; /* neutral gray fallback for games without a color yet */
 }
+
+.drag-handle {
+  cursor: grab;
+  margin-right: 6px;
+  color: var(--app-white-muted);
+  font-size: 14px;
+}
+
+.new-btn-draggable {
+  cursor: grab;
+}
+
+.new-btn-draggable:active {
+  cursor: grabbing;
+  opacity: 0.6;
+}

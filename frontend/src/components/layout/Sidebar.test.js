@@ -13,6 +13,7 @@ function renderSidebar(overrides = {}) {
     filteredTrackers: [],
     selectedTracker: null,
     setSelectedTracker: () => {},
+    setTrackers: () => {},
     ...overrides,
   };
   return render(<Sidebar {...props} />);
@@ -39,13 +40,13 @@ test('renders a button for each tracker passed in', () => {
   expect(screen.getByText('Romance Dawn')).toBeInTheDocument();
 });
 
-test('clicking a tracker selects it by index and switches to tracker view', () => {
+test('clicking a tracker selects it by setID and switches to tracker view', () => {
   const setSelectedTracker = jest.fn();
   const setView = jest.fn();
   renderSidebar({ filteredTrackers: mockTrackers, setSelectedTracker, setView });
 
   fireEvent.click(screen.getByText('Romance Dawn'));
 
-  expect(setSelectedTracker).toHaveBeenCalledWith(1);
+  expect(setSelectedTracker).toHaveBeenCalledWith('OP-01');
   expect(setView).toHaveBeenCalledWith('tracker');
 });
