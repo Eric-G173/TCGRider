@@ -8,6 +8,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.4",
+    "framer-motion": "^13.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.17.0",
@@ -22,11 +23,10 @@
     "wait-on": "^9.1.0"
   },
   "overrides": {
-  "@tootallnate/once": "2.0.1",
-  "underscore": "1.13.8"
-
-},
- "scripts": {
+    "@tootallnate/once": "2.0.1",
+    "underscore": "1.13.8"
+  },
+  "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
@@ -34,7 +34,7 @@
     "electron": "electron .",
     "server": "dotnet watch --project ../backend run",
     "dev": "concurrently -n REACT,ELECTRON,DOTNET -c blue,magenta,green \"npm start\" \"wait-on http://localhost:3000 && electron .\" \"npm run server\""
-},
+  },
   "eslintConfig": {
     "extends": [
       "react-app",
