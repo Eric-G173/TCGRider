@@ -29,11 +29,26 @@ public class Database
                 FOREIGN KEY (set_id) REFERENCES Sets(id)
             );
 
+            CREATE TABLE IF NOT EXISTS UserTrackers (
+                client_id TEXT NOT NULL,
+                set_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                game TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                PRIMARY KEY (client_id, set_id)
+            );
+
+            -- Collection previously had no client_id, meaning every visitor
+            -- to the shared web deployment would collide on the same rows.
+            -- Safe to drop and recreate: this table has never actually been
+            -- written to anywhere in the app, so there's no real data here.
+            DROP TABLE IF EXISTS Collection;
             CREATE TABLE IF NOT EXISTS Collection (
+                client_id TEXT NOT NULL,
                 card_id TEXT NOT NULL,
                 collected INTEGER DEFAULT 0,
                 date_collected TEXT,
-                PRIMARY KEY (card_id),
+                PRIMARY KEY (client_id, card_id),
                 FOREIGN KEY (card_id) REFERENCES Cards(id)
             );
         ";

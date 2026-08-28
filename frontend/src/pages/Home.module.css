@@ -176,3 +176,20 @@ html, body {
 
 
 
+/* Replace the existing .game-link-skeleton rule in Home.module.css with this */
+
+.game-link-skeleton {
+  color: var(--app-white-muted);
+  font-size: 18px;
+  padding: 12px;
+  border-radius: var(--app-radius-sm);
+  border: 1px solid var(--app-border);
+  background-color: var(--app-shell);
+  box-sizing: border-box;
+  animation: game-link-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes game-link-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
