@@ -187,7 +187,29 @@ app.MapPost("/api/sync/onepiece/{setId}", async (string setId) => {
     });
 });
 
+app.MapGet("/api/trackers", (string clientId) => {
+    var trackers = TrackerStore.GetTrackers(clientId);
+    return Results.Ok(trackers);
+});
+
+app.MapPost("/api/trackers", (TrackerRequest req) => {
+    TrackerStore.AddTracker(req.ClientId, req.SetId, req.Name, req.Game);
+    return Results.Ok(new { message = "Tracker saved" });
+});
+
+app.MapDelete("/api/trackers/{setId}", (string setId, string clientId) => {
+    TrackerStore.RemoveTracker(clientId, setId);
+    return Results.Ok(new { message = "Tracker removed" });
+});
+
+app.MapPut("/api/trackers/reorder", (ReorderRequest req) => {
+    TrackerStore.ReorderTrackers(req.ClientId, req.OrderedSetIds);
+    return Results.Ok(new { message = "Order saved" });
+});
+
 Database.Initialize();
 
+// Render (and most hosts) assign a port via PORT — 0.0.0.0 accepts
+// connections from outside the container, unlike localhost.
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 app.Run($"http://0.0.0.0:{port}");

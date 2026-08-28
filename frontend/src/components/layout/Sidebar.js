@@ -1,5 +1,7 @@
 import React from 'react';
 import styles from './Sidebar.module.css';
+import { API_BASE_URL } from '../../config';
+import { getClientId } from '../../clientID';
 
 function TaskBtn({ name, game, onClick, isSelected, isEditing, onDragStart, onDragOver, onDrop }) {
   return (
@@ -27,7 +29,7 @@ function Sidebar({ setView, filteredTrackers, selectedTracker, setSelectedTracke
   }
 
   function handleDragOver(e) {
-    e.preventDefault();
+    e.preventDefault(); // required by the browser to allow a drop to happen at all
   }
 
   function handleDrop(dropIndex) {
@@ -37,12 +39,24 @@ function Sidebar({ setView, filteredTrackers, selectedTracker, setSelectedTracke
     const draggedTracker = filteredTrackers[dragIndex];
     const targetTracker = filteredTrackers[dropIndex];
 
+    // Reorders the REAL trackers array by setID, not by index — safe even
+    // if the sidebar is currently showing a filtered subset.
     setTrackers(prev => {
       const updated = [...prev];
       const fromRealIndex = updated.findIndex(t => t.setID === draggedTracker.setID);
       const toRealIndex = updated.findIndex(t => t.setID === targetTracker.setID);
       const [moved] = updated.splice(fromRealIndex, 1);
       updated.splice(toRealIndex, 0, moved);
+
+      fetch(`${API_BASE_URL}/api/trackers/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: getClientId(),
+          orderedSetIds: updated.map(t => t.setID),
+        }),
+      }).catch(err => console.error("Failed to save new order", err));
+
       return updated;
     });
 
@@ -63,7 +77,7 @@ function Sidebar({ setView, filteredTrackers, selectedTracker, setSelectedTracke
           isSelected={selectedTracker === tracker.setID}
           isEditing={isEditing}
           onClick={() => {
-            if (isEditing) return; 
+            if (isEditing) return; // dragging, not navigating, while in edit mode
             setSelectedTracker(tracker.setID);
             setView('tracker');
           }}

@@ -5,6 +5,7 @@ import Sidebar from '../components/layout/Sidebar';
 import DefaultGrid from '../components/tracker/DefaultGrid';
 import CardGrid from '../components/tracker/CardGrid';
 import { API_BASE_URL } from '../config';
+import { getClientId } from '../clientID';
 
 function App() {
   const [search, setSearch] = React.useState('');
@@ -16,7 +17,7 @@ function App() {
   const [pokemonLoading, setPokemonLoading] = React.useState(true);
   const [onePieceLoading, setOnePieceLoading] = React.useState(true);
   const [availableSets, setAvailableSets] = React.useState([
-    ]);
+   ]);
 
   const filteredTrackers = trackers.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())
@@ -27,11 +28,38 @@ function App() {
       if (prev.some(t => t.setID === newTracker.setID)) return prev;
       return [...prev, newTracker];
     });
+
+    fetch(`${API_BASE_URL}/api/trackers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: getClientId(),
+        setId: newTracker.setID,
+        name: newTracker.name,
+        game: newTracker.game,
+      }),
+    }).catch(err => console.error("Failed to save tracker", err));
   }
+
+  React.useEffect(() => {
+    async function loadTrackers() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/trackers?clientId=${getClientId()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const saved = await res.json();
+        setTrackers(saved);
+      } catch (err) {
+        console.error("Failed to load saved trackers", err);
+      }
+    }
+    loadTrackers();
+  }, []);
 
   async function syncAndAddSet(set, game) {
     setSyncingSets(prev => new Set(prev).add(set.setID));
 
+    // Each game's card data lives behind a different sync endpoint —
+    // route based on which game group this set came from.
     const endpoint = game === "One Piece"
       ? `${API_BASE_URL}/api/sync/onepiece/${encodeURIComponent(set.setID)}`
       : `${API_BASE_URL}/api/sync/${encodeURIComponent(set.setID)}`;
@@ -122,8 +150,8 @@ function App() {
             <div className={styles['browse-view']}>
               {selectedGame === null ? (
                 <div className={styles['game-link-list']}>
-                  {pokemonLoading && <div className={styles['game-link-skeleton']} />}
-                  {onePieceLoading && <div className={styles['game-link-skeleton']} />}
+                  {pokemonLoading && <div className={styles['game-link-skeleton']}>Pokémon</div>}
+                  {onePieceLoading && <div className={styles['game-link-skeleton']}>One Piece</div>}
                   {availableSets.map((group, i) => (
                     <div
                       className={styles['game-link']}
