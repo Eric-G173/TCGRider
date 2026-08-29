@@ -36,6 +36,17 @@ app.UseCors("AllowReactApp");
 // pokemonHttpClient now that it's also used for One Piece)
 var setsHttpClient = new HttpClient();
 
+// Simple in-memory cache — the Pokemon sets fetch does a lot of expensive
+// network work (every series, then every series' full detail), which can
+// take long enough on Render's infra to hit the HttpClient timeout entirely.
+// Series/set lists barely change, so there's no reason to repeat this on
+// every single request.
+List<object>? cachedPokemonSets = null;
+DateTime pokemonSetsCachedAt = DateTime.MinValue;
+List<object>? cachedOnePieceSets = null;
+DateTime onePieceSetsCachedAt = DateTime.MinValue;
+var setsCacheDuration = TimeSpan.FromHours(6);
+
 // Sets get marked here (total = 0) once a real sync attempt confirms they
 // have no actual card data — TCGdex/OPTCG's own listing metadata isn't
 // reliable enough to catch this upfront, so this filters based on what's
@@ -64,6 +75,9 @@ var pokemonSeriesOrder = new List<string> {
 };
 
 app.MapGet("/api/sets/pokemon", async () => {
+    if (cachedPokemonSets != null && DateTime.UtcNow - pokemonSetsCachedAt < setsCacheDuration)
+        return Results.Ok(cachedPokemonSets);
+
     try
     {
         var seriesList = await setsHttpClient.GetFromJsonAsync<List<TcgdexSeriesBrief>>(
@@ -71,7 +85,7 @@ app.MapGet("/api/sets/pokemon", async () => {
         );
 
         if (seriesList == null)
-            return Results.Ok(new List<object>());
+            return Results.Ok(cachedPokemonSets ?? new List<object>());
 
         // Fetch each series' full set list in parallel — a fixed, small number
         // of calls (one per era, not per set), so this stays cheap.
@@ -106,18 +120,24 @@ app.MapGet("/api/sets/pokemon", async () => {
             )
             .Where(set => !knownEmpty.Contains(set.Id))
             .Select(set => new { name = set.Name, setID = set.Id })
-            .ToList();
+            .ToList<object>();
 
+        cachedPokemonSets = sets;
+        pokemonSetsCachedAt = DateTime.UtcNow;
         return Results.Ok(sets);
     }
     catch (Exception ex)
     {
         Console.WriteLine($"TCGdex API error: {ex.GetType().Name} - {ex.Message}");
-        return Results.Ok(new List<object>());
+        // Serve stale cached data rather than an empty list, if we have any
+        return Results.Ok(cachedPokemonSets ?? new List<object>());
     }
 });
 
 app.MapGet("/api/sets/onepiece", async () => {
+    if (cachedOnePieceSets != null && DateTime.UtcNow - onePieceSetsCachedAt < setsCacheDuration)
+        return Results.Ok(cachedOnePieceSets);
+
     try
     {
         var response = await setsHttpClient.GetFromJsonAsync<List<OptcgSet>>(
@@ -125,20 +145,23 @@ app.MapGet("/api/sets/onepiece", async () => {
         );
 
         if (response == null)
-            return Results.Ok(new List<object>());
+            return Results.Ok(cachedOnePieceSets ?? new List<object>());
 
         var knownEmpty = GetKnownEmptySetIds();
 
         var sets = response
             .Where(s => !knownEmpty.Contains(s.SetId))
             .Select(s => new { name = s.SetName, setID = s.SetId })
-            .ToList();
+            .ToList<object>();
+
+        cachedOnePieceSets = sets;
+        onePieceSetsCachedAt = DateTime.UtcNow;
         return Results.Ok(sets);
     }
     catch (Exception ex)
     {
         Console.WriteLine($"OPTCG API error: {ex.GetType().Name} - {ex.Message}");
-        return Results.Ok(new List<object>());
+        return Results.Ok(cachedOnePieceSets ?? new List<object>());
     }
 });
 
