@@ -117,6 +117,8 @@ app.MapPost("/api/admin/seed-catalog", async () => {
     clearCommand.ExecuteNonQuery();
 
     int totalSeeded = 0;
+    int pokemonSeeded = 0;
+    int onePieceSeeded = 0;
     var knownEmpty = GetKnownEmptySetIds();
 
     try
@@ -170,6 +172,7 @@ app.MapPost("/api/admin/seed-catalog", async () => {
                     insertCommand.Parameters.AddWithValue("$order", order++);
                     insertCommand.ExecuteNonQuery();
                     totalSeeded++;
+                    pokemonSeeded++;
                 }
             }
         }
@@ -201,6 +204,7 @@ app.MapPost("/api/admin/seed-catalog", async () => {
                 insertCommand.Parameters.AddWithValue("$order", order++);
                 insertCommand.ExecuteNonQuery();
                 totalSeeded++;
+                onePieceSeeded++;
             }
         }
     }
@@ -209,7 +213,11 @@ app.MapPost("/api/admin/seed-catalog", async () => {
         Console.WriteLine($"Seed error (One Piece): {ex.GetType().Name} - {ex.Message}");
     }
 
-    return Results.Ok(new { message = $"Seeded {totalSeeded} sets into the catalog" });
+    return Results.Ok(new {
+        message = $"Seeded {totalSeeded} sets total",
+        pokemon = pokemonSeeded,
+        onePiece = onePieceSeeded
+    });
 });
 
 app.MapGet("/api/cards/{setId}", (string setId) => {
