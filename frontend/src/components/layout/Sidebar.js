@@ -39,8 +39,6 @@ function Sidebar({ setView, filteredTrackers, selectedTracker, setSelectedTracke
     const draggedTracker = filteredTrackers[dragIndex];
     const targetTracker = filteredTrackers[dropIndex];
 
-    // Reorders the REAL trackers array by setID, not by index — safe even
-    // if the sidebar is currently showing a filtered subset.
     setTrackers(prev => {
       const updated = [...prev];
       const fromRealIndex = updated.findIndex(t => t.setID === draggedTracker.setID);
@@ -65,34 +63,38 @@ function Sidebar({ setView, filteredTrackers, selectedTracker, setSelectedTracke
 
   return (
     <aside className={styles['App-sidebar']}>
-      <button className={styles['new-tracker']} onClick={() => setView('browse')}>
-        <span className={styles['btn-plus']}>+</span> New Tracker
-      </button>
+      <div className={styles['sidebar-scroll']}>
+        <button className={styles['new-tracker']} onClick={() => setView('browse')}>
+          <span className={styles['btn-plus']}>+</span> New Tracker
+        </button>
 
-      {filteredTrackers.map((tracker, index) => (
-        <TaskBtn
-          key={tracker.setID}
-          name={tracker.name}
-          game={tracker.game}
-          isSelected={selectedTracker === tracker.setID}
-          isEditing={isEditing}
-          onClick={() => {
-            if (isEditing) return; // dragging, not navigating, while in edit mode
-            setSelectedTracker(tracker.setID);
-            setView('tracker');
-          }}
-          onDragStart={() => handleDragStart(index)}
-          onDragOver={handleDragOver}
-          onDrop={() => handleDrop(index)}
-        />
-      ))}
+        {filteredTrackers.map((tracker, index) => (
+          <TaskBtn
+            key={tracker.setID}
+            name={tracker.name}
+            game={tracker.game}
+            isSelected={selectedTracker === tracker.setID}
+            isEditing={isEditing}
+            onClick={() => {
+              if (isEditing) return; // dragging, not navigating, while in edit mode
+              setSelectedTracker(tracker.setID);
+              setView('tracker');
+            }}
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={handleDragOver}
+            onDrop={() => handleDrop(index)}
+          />
+        ))}
+      </div>
 
-      <button
-        className={styles['edit-trackers']}
-        onClick={() => setIsEditing(prev => !prev)}
-      >
-        {isEditing ? 'Done' : 'Edit'}
-      </button>
+      <div className={styles['sidebar-footer']}>
+        <button
+          className={styles['edit-trackers']}
+          onClick={() => setIsEditing(prev => !prev)}
+        >
+          {isEditing ? 'Done' : 'Edit'}
+        </button>
+      </div>
     </aside>
   )
 }
