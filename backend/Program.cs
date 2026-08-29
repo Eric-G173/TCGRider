@@ -34,24 +34,12 @@ app.UseCors("AllowReactApp");
 
 // shared client reused across the /api/sets/* endpoints (renamed from
 // pokemonHttpClient now that it's also used for One Piece)
-// Timeout reduced from the 100s default — if TCGdex/OPTCG is unreachable,
-// we want that to fail fast, not leave the frontend "loading" for 100+
-// seconds before the skeleton finally clears.
+// Timeout reduced from the 100s default — if TCGdex/OPTCG is unreachable
+// during a seed run, we want that to fail fast rather than hang.
 var setsHttpClient = new HttpClient
 {
-    Timeout = TimeSpan.FromSeconds(30)
+    Timeout = TimeSpan.FromSeconds(15)
 };
-
-// Simple in-memory cache — the Pokemon sets fetch does a lot of expensive
-// network work (every series, then every series' full detail), which can
-// take long enough on Render's infra to hit the HttpClient timeout entirely.
-// Series/set lists barely change, so there's no reason to repeat this on
-// every single request.
-List<object>? cachedPokemonSets = null;
-DateTime pokemonSetsCachedAt = DateTime.MinValue;
-List<object>? cachedOnePieceSets = null;
-DateTime onePieceSetsCachedAt = DateTime.MinValue;
-var setsCacheDuration = TimeSpan.FromHours(6);
 
 // Sets get marked here (total = 0) once a real sync attempt confirms they
 // have no actual card data — TCGdex/OPTCG's own listing metadata isn't
@@ -80,9 +68,56 @@ var pokemonSeriesOrder = new List<string> {
     "Sword & Shield", "Scarlet & Violet"
 };
 
-app.MapGet("/api/sets/pokemon", async () => {
-    if (cachedPokemonSets != null && DateTime.UtcNow - pokemonSetsCachedAt < setsCacheDuration)
-        return Results.Ok(cachedPokemonSets);
+app.MapGet("/api/sets/pokemon", () => {
+    using var connection = Database.GetConnection();
+    var command = connection.CreateCommand();
+    command.CommandText = @"
+        SELECT id, name FROM SetCatalog
+        WHERE game = 'Pokémon'
+        ORDER BY sort_order
+    ";
+
+    var sets = new List<object>();
+    using var reader = command.ExecuteReader();
+    while (reader.Read())
+        sets.Add(new { setID = reader.GetString(0), name = reader.GetString(1) });
+
+    return Results.Ok(sets);
+});
+
+app.MapGet("/api/sets/onepiece", () => {
+    using var connection = Database.GetConnection();
+    var command = connection.CreateCommand();
+    command.CommandText = @"
+        SELECT id, name FROM SetCatalog
+        WHERE game = 'One Piece'
+        ORDER BY sort_order
+    ";
+
+    var sets = new List<object>();
+    using var reader = command.ExecuteReader();
+    while (reader.Read())
+        sets.Add(new { setID = reader.GetString(0), name = reader.GetString(1) });
+
+    return Results.Ok(sets);
+});
+
+// One-time (or occasional, if you re-run it) bulk load — this is the ONLY
+// place that still talks to TCGdex/OPTCG for set LISTINGS. Trigger manually
+// by visiting this URL in a browser or via curl; it's idempotent, so
+// running it again just refreshes the catalog rather than duplicating rows.
+// NOTE: unauthenticated for now, matching the rest of this app's no-login
+// design — fine for a low-stakes personal project, but anyone who finds
+// the URL could trigger it. An easy hardening step later: require a
+// ?key=... query param checked against an environment variable.
+app.MapPost("/api/admin/seed-catalog", async () => {
+    using var connection = Database.GetConnection();
+    var clearCommand = connection.CreateCommand();
+    clearCommand.CommandText = "DELETE FROM SetCatalog";
+    clearCommand.ExecuteNonQuery();
+
+    int totalSeeded = 0;
+    var knownEmpty = GetKnownEmptySetIds();
 
     try
     {
@@ -90,59 +125,59 @@ app.MapGet("/api/sets/pokemon", async () => {
             "https://api.tcgdex.net/v2/en/series"
         );
 
-        if (seriesList == null)
-            return Results.Ok(cachedPokemonSets ?? new List<object>());
-
-        // Fetch each series' full set list in parallel — a fixed, small number
-        // of calls (one per era, not per set), so this stays cheap.
-        var seriesDetailTasks = seriesList.Select(async s => {
-            try
-            {
-                return await setsHttpClient.GetFromJsonAsync<TcgdexSeriesFull>(
-                    $"https://api.tcgdex.net/v2/en/series/{s.Id}"
-                );
-            }
-            catch
-            {
-                return null; // one bad series shouldn't take down the whole list
-            }
-        });
-        var seriesDetails = await Task.WhenAll(seriesDetailTasks);
-
-        var orderedSeries = seriesDetails
-            .Where(s => s != null)
-            .OrderBy(s => {
-                int idx = pokemonSeriesOrder.FindIndex(era =>
-                    s!.Name.Contains(era, StringComparison.OrdinalIgnoreCase));
-                return idx == -1 ? int.MaxValue : idx; // unrecognized series sort last, not dropped
+        if (seriesList != null)
+        {
+            var seriesDetailTasks = seriesList.Select(async s => {
+                try
+                {
+                    return await setsHttpClient.GetFromJsonAsync<TcgdexSeriesFull>(
+                        $"https://api.tcgdex.net/v2/en/series/{s.Id}"
+                    );
+                }
+                catch
+                {
+                    return null;
+                }
             });
+            var seriesDetails = await Task.WhenAll(seriesDetailTasks);
 
-        var knownEmpty = GetKnownEmptySetIds();
+            var orderedSeries = seriesDetails
+                .Where(s => s != null)
+                .OrderBy(s => {
+                    int idx = pokemonSeriesOrder.FindIndex(era =>
+                        s!.Name.Contains(era, StringComparison.OrdinalIgnoreCase));
+                    return idx == -1 ? int.MaxValue : idx;
+                });
 
-        var sets = orderedSeries
-            .SelectMany(s => (s!.Sets ?? new List<TcgdexSetBrief>())
-                .Where(set => (set.CardCount?.Total ?? 0) > 0) // drop sets with no actual cards
-                .OrderBy(set => ApiSync.ExtractSetNumber(set.Id))
-            )
-            .Where(set => !knownEmpty.Contains(set.Id))
-            .Select(set => new { name = set.Name, setID = set.Id })
-            .ToList<object>();
+            int order = 0;
+            foreach (var series in orderedSeries)
+            {
+                var setsInSeries = (series!.Sets ?? new List<TcgdexSetBrief>())
+                    .Where(set => (set.CardCount?.Total ?? 0) > 0)
+                    .Where(set => !knownEmpty.Contains(set.Id))
+                    .OrderBy(set => ApiSync.ExtractSetNumber(set.Id));
 
-        cachedPokemonSets = sets;
-        pokemonSetsCachedAt = DateTime.UtcNow;
-        return Results.Ok(sets);
+                foreach (var set in setsInSeries)
+                {
+                    var insertCommand = connection.CreateCommand();
+                    insertCommand.CommandText = @"
+                        INSERT OR REPLACE INTO SetCatalog (id, name, game, sort_order)
+                        VALUES ($id, $name, $game, $order)
+                    ";
+                    insertCommand.Parameters.AddWithValue("$id", set.Id);
+                    insertCommand.Parameters.AddWithValue("$name", set.Name);
+                    insertCommand.Parameters.AddWithValue("$game", "Pokémon");
+                    insertCommand.Parameters.AddWithValue("$order", order++);
+                    insertCommand.ExecuteNonQuery();
+                    totalSeeded++;
+                }
+            }
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"TCGdex API error: {ex.GetType().Name} - {ex.Message}");
-        // Serve stale cached data rather than an empty list, if we have any
-        return Results.Ok(cachedPokemonSets ?? new List<object>());
+        Console.WriteLine($"Seed error (Pokémon): {ex.GetType().Name} - {ex.Message}");
     }
-});
-
-app.MapGet("/api/sets/onepiece", async () => {
-    if (cachedOnePieceSets != null && DateTime.UtcNow - onePieceSetsCachedAt < setsCacheDuration)
-        return Results.Ok(cachedOnePieceSets);
 
     try
     {
@@ -150,25 +185,31 @@ app.MapGet("/api/sets/onepiece", async () => {
             "https://optcgapi.com/api/allSets/"
         );
 
-        if (response == null)
-            return Results.Ok(cachedOnePieceSets ?? new List<object>());
-
-        var knownEmpty = GetKnownEmptySetIds();
-
-        var sets = response
-            .Where(s => !knownEmpty.Contains(s.SetId))
-            .Select(s => new { name = s.SetName, setID = s.SetId })
-            .ToList<object>();
-
-        cachedOnePieceSets = sets;
-        onePieceSetsCachedAt = DateTime.UtcNow;
-        return Results.Ok(sets);
+        if (response != null)
+        {
+            int order = 0;
+            foreach (var set in response.Where(s => !knownEmpty.Contains(s.SetId)))
+            {
+                var insertCommand = connection.CreateCommand();
+                insertCommand.CommandText = @"
+                    INSERT OR REPLACE INTO SetCatalog (id, name, game, sort_order)
+                    VALUES ($id, $name, $game, $order)
+                ";
+                insertCommand.Parameters.AddWithValue("$id", set.SetId);
+                insertCommand.Parameters.AddWithValue("$name", set.SetName);
+                insertCommand.Parameters.AddWithValue("$game", "One Piece");
+                insertCommand.Parameters.AddWithValue("$order", order++);
+                insertCommand.ExecuteNonQuery();
+                totalSeeded++;
+            }
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"OPTCG API error: {ex.GetType().Name} - {ex.Message}");
-        return Results.Ok(cachedOnePieceSets ?? new List<object>());
+        Console.WriteLine($"Seed error (One Piece): {ex.GetType().Name} - {ex.Message}");
     }
+
+    return Results.Ok(new { message = $"Seeded {totalSeeded} sets into the catalog" });
 });
 
 app.MapGet("/api/cards/{setId}", (string setId) => {

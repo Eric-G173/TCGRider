@@ -38,6 +38,17 @@ public class Database
                 PRIMARY KEY (client_id, set_id)
             );
 
+            -- The full browsable list of sets per game — populated once via
+            -- POST /api/admin/seed-catalog, then read from locally instead
+            -- of hitting TCGdex/OPTCG live on every browse. Distinct from
+            -- Sets, which only holds sets a user has actually synced.
+            CREATE TABLE IF NOT EXISTS SetCatalog (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                game TEXT NOT NULL,
+                sort_order INTEGER NOT NULL
+            );
+
             -- Collection previously had no client_id, meaning every visitor
             -- to the shared web deployment would collide on the same rows.
             -- Safe to drop and recreate: this table has never actually been
