@@ -34,7 +34,13 @@ app.UseCors("AllowReactApp");
 
 // shared client reused across the /api/sets/* endpoints (renamed from
 // pokemonHttpClient now that it's also used for One Piece)
-var setsHttpClient = new HttpClient();
+// Timeout reduced from the 100s default — if TCGdex/OPTCG is unreachable,
+// we want that to fail fast, not leave the frontend "loading" for 100+
+// seconds before the skeleton finally clears.
+var setsHttpClient = new HttpClient
+{
+    Timeout = TimeSpan.FromSeconds(30)
+};
 
 // Simple in-memory cache — the Pokemon sets fetch does a lot of expensive
 // network work (every series, then every series' full detail), which can
