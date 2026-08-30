@@ -32,10 +32,11 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var app = builder.Build();
 app.UseCors("AllowReactApp");
 
-// shared client reused across the /api/sets/* endpoints (renamed from
-// pokemonHttpClient now that it's also used for One Piece)
-// Timeout reduced from the 100s default — if TCGdex/OPTCG is unreachable
-// during a seed run, we want that to fail fast rather than hang.
+// shared client — now used ONLY by the one-time /api/admin/seed-catalog
+// endpoint, since the browse routes read from SetCatalog instead. A longer
+// timeout is fine here: nothing user-facing waits on this anymore, and
+// TCGdex's full series+sets payload has grown large enough that 15s was
+// too tight even under normal conditions, not just degraded ones.
 var setsHttpClient = new HttpClient
 {
     Timeout = TimeSpan.FromSeconds(90)
@@ -124,7 +125,7 @@ app.MapPost("/api/admin/seed-catalog", async () => {
     try
     {
         var seriesList = await setsHttpClient.GetFromJsonAsync<List<TcgdexSeriesBrief>>(
-            "https://api.tcgdex.net/v2/en/series"
+            "https://api.eu1.tcgdex.net/v2/en/series"
         );
 
         if (seriesList != null)
@@ -133,7 +134,7 @@ app.MapPost("/api/admin/seed-catalog", async () => {
                 try
                 {
                     return await setsHttpClient.GetFromJsonAsync<TcgdexSeriesFull>(
-                        $"https://api.tcgdex.net/v2/en/series/{s.Id}"
+                        $"https://api.eu1.tcgdex.net/v2/en/series/{s.Id}"
                     );
                 }
                 catch
@@ -247,6 +248,65 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
 
 
     return Results.Ok(new {cards, hasMissingImages});
+});
+
+// Bulk pre-loads full card data for every set in the catalog, so that
+// EVERY user's first-ever sync of a set is a pure DB read, not a live
+// API call. Reuses the existing SyncPokemonSet/SyncOnePieceSet logic —
+// this just loops over sets that haven't been synced yet.
+//
+// Designed to be called REPEATEDLY, not once: it only processes a small
+// batch per call (default 10 sets), so a single request can't time out
+// no matter how large the full catalog is. Already-synced sets are
+// automatically skipped, so re-running this is always safe — it just
+// picks up wherever the last call left off.
+app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
+    int limit = batchSize ?? 10;
+    using var connection = Database.GetConnection();
+
+    var command = connection.CreateCommand();
+    command.CommandText = @"
+        SELECT sc.id, sc.game FROM SetCatalog sc
+        LEFT JOIN Sets s ON sc.id = s.id
+        WHERE s.id IS NULL OR s.total = 0
+        LIMIT $limit
+    ";
+    command.Parameters.AddWithValue("$limit", limit);
+
+    var setsToSync = new List<(string Id, string Game)>();
+    using (var reader = command.ExecuteReader())
+    {
+        while (reader.Read())
+            setsToSync.Add((reader.GetString(0), reader.GetString(1)));
+    }
+
+    var results = new List<object>();
+    foreach (var (setId, game) in setsToSync)
+    {
+        try
+        {
+            bool hasCards = game == "One Piece"
+                ? await ApiSync.SyncOnePieceSet(setId)
+                : await ApiSync.SyncPokemonSet(setId);
+            results.Add(new { setId, game, success = hasCards });
+        }
+        catch (Exception ex)
+        {
+            // One bad set shouldn't stop the whole batch — record it and
+            // move on; it'll just get picked up again on the next call.
+            results.Add(new { setId, game, success = false, error = ex.Message });
+        }
+    }
+
+    var remainingCommand = connection.CreateCommand();
+    remainingCommand.CommandText = @"
+        SELECT COUNT(*) FROM SetCatalog sc
+        LEFT JOIN Sets s ON sc.id = s.id
+        WHERE s.id IS NULL OR s.total = 0
+    ";
+    int remaining = Convert.ToInt32(remainingCommand.ExecuteScalar());
+
+    return Results.Ok(new { synced = results, remainingSets = remaining });
 });
 
 app.MapPost("/api/sync/{setId}", async (string setId) => {
