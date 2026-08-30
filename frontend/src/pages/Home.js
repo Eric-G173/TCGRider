@@ -16,6 +16,7 @@ function App() {
   const [selectedGame, setSelectedGame] = React.useState(null);
   const [pokemonLoading, setPokemonLoading] = React.useState(true);
   const [onePieceLoading, setOnePieceLoading] = React.useState(true);
+  const [yugiohLoading, setYugiohLoading] = React.useState(true);
   const [availableSets, setAvailableSets] = React.useState([
    ]);
 
@@ -60,9 +61,11 @@ function App() {
 
     // Each game's card data lives behind a different sync endpoint —
     // route based on which game group this set came from.
-    const endpoint = game === "One Piece"
-      ? `${API_BASE_URL}/api/sync/onepiece/${encodeURIComponent(set.setID)}`
-      : `${API_BASE_URL}/api/sync/${encodeURIComponent(set.setID)}`;
+   const endpoint = game === "One Piece"
+  ? `${API_BASE_URL}/api/sync/onepiece/${encodeURIComponent(set.setID)}`
+  : game === "Yu-Gi-Oh"
+  ? `${API_BASE_URL}/api/sync/yugioh/${encodeURIComponent(set.setID)}`
+  : `${API_BASE_URL}/api/sync/${encodeURIComponent(set.setID)}`;
 
     try {
       const res = await fetch(endpoint, { method: 'POST' });
@@ -136,6 +139,31 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    async function loadYuGiOhSets() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sets/yugioh`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const sets = await res.json();
+
+        if (cancelled) return;
+
+        setAvailableSets(prev => {
+          const others = prev.filter(g => g.game !== "Yu-Gi-Oh");
+          return [{ game: "Yu-Gi-Oh", sets }, ...others];
+        });
+      } catch (err) {
+        console.error("Failed to load Yu-Gi-Oh sets", err);
+      } finally {
+        if (!cancelled) setYugiohLoading(false);
+      }
+    }
+
+    loadYuGiOhSets();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className={styles.App}>
       <TopBar search={search} setSearch={setSearch} />
@@ -152,6 +180,7 @@ function App() {
                 <div className={styles['game-link-list']}>
                   {pokemonLoading && <div className={styles['game-link-skeleton']}>Pokémon</div>}
                   {onePieceLoading && <div className={styles['game-link-skeleton']}>One Piece</div>}
+                  {yugiohLoading && <div className={styles['game-link-skeleton']}>Yu-Gi-Oh</div>}
                   {availableSets.map((group, i) => (
                     <div
                       className={styles['game-link']}

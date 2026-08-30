@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Sidebar from './Sidebar';
 
+//ADD YUGIOH
 const mockTrackers = [
   { name: 'Base Set', setID: 'base1', game: 'Pokémon' },
   { name: 'Romance Dawn', setID: 'OP-01', game: 'One Piece' },

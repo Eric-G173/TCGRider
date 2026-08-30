@@ -98,6 +98,10 @@
   border-left: 4px solid #D71920;
 }
 
+.new-btn[data-game="Yu-Gi-Oh"] {
+  border-left: 4px solid #04ac3c;
+}
+
 .drag-handle {
   cursor: grab;
   margin-right: 6px;
