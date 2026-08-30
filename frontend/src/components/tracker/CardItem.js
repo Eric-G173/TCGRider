@@ -1,8 +1,18 @@
 import React from 'react';
 import styles from './CardItem.module.css';
+import { API_BASE_URL } from '../../config';
 
 function CardItem({ card, isSelected, isCollected, onToggleCollected, onOpen, cardRef }) {
   const [imageLoaded, setImageLoaded] = React.useState(false);
+
+  // Pokemon/One Piece store full external CDN URLs — used as-is. Yu-Gi-Oh
+  // stores a relative path to its self-hosted images (required by
+  // YGOPRODeck's no-hotlinking terms) — that needs the backend's own
+  // origin prefixed on, or the browser resolves it against the frontend's
+  // origin instead and finds nothing there.
+  const resolvedImageUrl = card.imageUrl?.startsWith('/')
+    ? `${API_BASE_URL}${card.imageUrl}`
+    : card.imageUrl;
 
   return (
     <div
@@ -18,7 +28,7 @@ function CardItem({ card, isSelected, isCollected, onToggleCollected, onOpen, ca
       >
         <img
           className={`${styles['card-img']} ${imageLoaded ? styles.loaded : ''}`}
-          src={card.imageUrl}
+          src={resolvedImageUrl}
           alt={card.name}
           loading="lazy"
           onLoad={() => setImageLoaded(true)}

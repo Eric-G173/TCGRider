@@ -32,6 +32,18 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var app = builder.Build();
 app.UseCors("AllowReactApp");
 
+// Serves downloaded Yu-Gi-Oh card images back out over HTTP. A file saved
+// at card-images/yugioh/12345.jpg becomes reachable at
+// {API_BASE_URL}/card-images/yugioh/12345.jpg — this is what makes
+// self-hosting (required by YGOPRODeck's terms) actually work.
+var cardImagesPath = Path.Combine(Directory.GetCurrentDirectory(), "card-images");
+Directory.CreateDirectory(cardImagesPath);
+app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(cardImagesPath),
+    RequestPath = "/card-images"
+});
+
 // shared client — now used ONLY by the one-time /api/admin/seed-catalog
 // endpoint, since the browse routes read from SetCatalog instead. A longer
 // timeout is fine here: nothing user-facing waits on this anymore, and
@@ -214,10 +226,50 @@ app.MapPost("/api/admin/seed-catalog", async () => {
         Console.WriteLine($"Seed error (One Piece): {ex.GetType().Name} - {ex.Message}");
     }
 
+    int yuGiOhSeeded = 0;
+    try
+    {
+        var ygoSets = await setsHttpClient.GetFromJsonAsync<List<YgoCardSetListing>>(
+            "https://db.ygoprodeck.com/api/v7/cardsets.php"
+        );
+
+        if (ygoSets != null)
+        {
+            var orderedYgoSets = ygoSets
+                .Where(s => !knownEmpty.Contains(s.SetName))
+                .OrderBy(s => s.TcgDate ?? "9999-99-99"); // undated sets sort last
+
+            int order = 0;
+            foreach (var set in orderedYgoSets)
+            {
+                var insertCommand = connection.CreateCommand();
+                insertCommand.CommandText = @"
+                    INSERT OR REPLACE INTO SetCatalog (id, name, game, sort_order)
+                    VALUES ($id, $name, $game, $order)
+                ";
+                // YGOPRODeck identifies sets by name, not a separate code —
+                // this same string gets passed to cardinfo.php?cardset=...
+                // later, so it has to match exactly.
+                insertCommand.Parameters.AddWithValue("$id", set.SetName);
+                insertCommand.Parameters.AddWithValue("$name", set.SetName);
+                insertCommand.Parameters.AddWithValue("$game", "Yu-Gi-Oh");
+                insertCommand.Parameters.AddWithValue("$order", order++);
+                insertCommand.ExecuteNonQuery();
+                totalSeeded++;
+                yuGiOhSeeded++;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Seed error (Yu-Gi-Oh): {ex.GetType().Name} - {ex.Message}");
+    }
+
     return Results.Ok(new {
         message = $"Seeded {totalSeeded} sets total",
         pokemon = pokemonSeeded,
-        onePiece = onePieceSeeded
+        onePiece = onePieceSeeded,
+        yuGiOh = yuGiOhSeeded
     });
 });
 
@@ -260,6 +312,36 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
 // no matter how large the full catalog is. Already-synced sets are
 // automatically skipped, so re-running this is always safe — it just
 // picks up wherever the last call left off.
+app.MapGet("/api/admin/catalog-status", () => {
+    using var connection = Database.GetConnection();
+
+    var catalogCommand = connection.CreateCommand();
+    catalogCommand.CommandText = "SELECT COUNT(*) FROM SetCatalog";
+    int catalogTotal = Convert.ToInt32(catalogCommand.ExecuteScalar());
+
+    var syncedCommand = connection.CreateCommand();
+    syncedCommand.CommandText = "SELECT COUNT(*) FROM Sets WHERE total > 0";
+    int setsSynced = Convert.ToInt32(syncedCommand.ExecuteScalar());
+
+    var emptyCommand = connection.CreateCommand();
+    emptyCommand.CommandText = "SELECT COUNT(*) FROM Sets WHERE total = 0";
+    int setsMarkedEmpty = Convert.ToInt32(emptyCommand.ExecuteScalar());
+
+    var remainingCommand = connection.CreateCommand();
+    remainingCommand.CommandText = @"
+        SELECT COUNT(*) FROM SetCatalog sc
+        LEFT JOIN Sets s ON sc.id = s.id
+        WHERE s.id IS NULL OR s.total = 0
+    ";
+    int remainingToSync = Convert.ToInt32(remainingCommand.ExecuteScalar());
+
+    var cardsCommand = connection.CreateCommand();
+    cardsCommand.CommandText = "SELECT COUNT(*) FROM Cards";
+    int totalCards = Convert.ToInt32(cardsCommand.ExecuteScalar());
+
+    return Results.Ok(new { catalogTotal, setsSynced, setsMarkedEmpty, remainingToSync, totalCards });
+});
+
 app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
     int limit = batchSize ?? 10;
     using var connection = Database.GetConnection();
@@ -285,9 +367,12 @@ app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
     {
         try
         {
-            bool hasCards = game == "One Piece"
-                ? await ApiSync.SyncOnePieceSet(setId)
-                : await ApiSync.SyncPokemonSet(setId);
+            bool hasCards = game switch
+            {
+                "One Piece" => await ApiSync.SyncOnePieceSet(setId),
+                "Yu-Gi-Oh" => await ApiSync.SyncYuGiOhSet(setId),
+                _ => await ApiSync.SyncPokemonSet(setId)
+            };
             results.Add(new { setId, game, success = hasCards });
         }
         catch (Exception ex)
@@ -323,6 +408,31 @@ app.MapPost("/api/sync/onepiece/{setId}", async (string setId) => {
         hasCards,
         message = hasCards ? $"Synced One Piece set {setId}" : $"Set {setId} has no card data available"
     });
+});
+
+app.MapPost("/api/sync/yugioh/{setId}", async (string setId) => {
+    bool hasCards = await ApiSync.SyncYuGiOhSet(setId);
+    return Results.Ok(new {
+        hasCards,
+        message = hasCards ? $"Synced Yu-Gi-Oh set {setId}" : $"Set {setId} has no card data available"
+    });
+});
+
+app.MapGet("/api/sets/yugioh", () => {
+    using var connection = Database.GetConnection();
+    var command = connection.CreateCommand();
+    command.CommandText = @"
+        SELECT id, name FROM SetCatalog
+        WHERE game = 'Yu-Gi-Oh'
+        ORDER BY sort_order
+    ";
+
+    var sets = new List<object>();
+    using var reader = command.ExecuteReader();
+    while (reader.Read())
+        sets.Add(new { setID = reader.GetString(0), name = reader.GetString(1) });
+
+    return Results.Ok(sets);
 });
 
 app.MapGet("/api/trackers", (string clientId) => {
