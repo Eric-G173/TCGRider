@@ -38,7 +38,7 @@ app.UseCors("AllowReactApp");
 // during a seed run, we want that to fail fast rather than hang.
 var setsHttpClient = new HttpClient
 {
-    Timeout = TimeSpan.FromSeconds(15)
+    Timeout = TimeSpan.FromSeconds(90)
 };
 
 // Sets get marked here (total = 0) once a real sync attempt confirms they
