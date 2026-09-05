@@ -123,7 +123,7 @@ app.MapGet("/api/sets/onepiece", () => {
 // design — fine for a low-stakes personal project, but anyone who finds
 // the URL could trigger it. An easy hardening step later: require a
 // ?key=... query param checked against an environment variable.
-app.MapPost("/api/admin/seed-catalog", async () => {
+async Task<object> SeedCatalogAsync() {
     using var connection = Database.GetConnection();
     var clearCommand = connection.CreateCommand();
     clearCommand.CommandText = "DELETE FROM SetCatalog";
@@ -265,13 +265,15 @@ app.MapPost("/api/admin/seed-catalog", async () => {
         Console.WriteLine($"Seed error (Yu-Gi-Oh): {ex.GetType().Name} - {ex.Message}");
     }
 
-    return Results.Ok(new {
+    return new {
         message = $"Seeded {totalSeeded} sets total",
         pokemon = pokemonSeeded,
         onePiece = onePieceSeeded,
         yuGiOh = yuGiOhSeeded
-    });
-});
+    };
+}
+
+app.MapPost("/api/admin/seed-catalog", async () => Results.Ok(await SeedCatalogAsync()));
 
 app.MapGet("/api/cards/{setId}", (string setId) => {
     using var connection = Database.GetConnection();
@@ -456,6 +458,25 @@ app.MapPut("/api/trackers/reorder", (ReorderRequest req) => {
 });
 
 Database.Initialize();
+
+// Free-tier hosts wipe ephemeral storage on spin-down/restart, which was
+// leaving the live demo empty until someone manually re-ran the seed.
+// This makes that self-healing: check once at startup, and if the
+// catalog's empty, kick off a real reseed automatically. Fire-and-forget
+// (not awaited) so a slow/degraded TCGdex doesn't delay the app actually
+// starting to listen for requests.
+using (var startupConnection = Database.GetConnection())
+{
+    var checkCommand = startupConnection.CreateCommand();
+    checkCommand.CommandText = "SELECT COUNT(*) FROM SetCatalog";
+    int catalogCount = Convert.ToInt32(checkCommand.ExecuteScalar());
+
+    if (catalogCount == 0)
+    {
+        Console.WriteLine("SetCatalog is empty on startup — auto-seeding in the background...");
+        _ = SeedCatalogAsync();
+    }
+}
 
 // Render (and most hosts) assign a port via PORT — 0.0.0.0 accepts
 // connections from outside the container, unlike localhost.
