@@ -63,8 +63,8 @@ app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
     RequestPath = "/card-images"
 });
 
-// shared client — now used ONLY by the one-time /api/admin/seed-catalog
-// endpoint, since the browse routes read from SetCatalog instead. A longer
+// shared client — now used ONLY by the one-time /api/admin/seed-dynamodb-catalog
+// endpoint, since the browse routes read from DynamoDB directly. A longer
 // timeout is fine here: nothing user-facing waits on this anymore, and
 // TCGdex's full series+sets payload has grown large enough that 15s was
 // too tight even under normal conditions, not just degraded ones.
@@ -121,169 +121,8 @@ app.MapGet("/api/sets/onepiece", async () => {
     return Results.Ok(sets);
 });
 
-// One-time (or occasional, if you re-run it) bulk load — this is the ONLY
-// place that still talks to TCGdex/OPTCG for set LISTINGS. Trigger manually
-// by visiting this URL in a browser or via curl; it's idempotent, so
-// running it again just refreshes the catalog rather than duplicating rows.
-// NOTE: unauthenticated for now, matching the rest of this app's no-login
-// design — fine for a low-stakes personal project, but anyone who finds
-// the URL could trigger it. An easy hardening step later: require a
-// ?key=... query param checked against an environment variable.
-async Task<object> SeedCatalogAsync() {
-    using var connection = Database.GetConnection();
-    var clearCommand = connection.CreateCommand();
-    clearCommand.CommandText = "DELETE FROM SetCatalog";
-    clearCommand.ExecuteNonQuery();
-
-    int totalSeeded = 0;
-    int pokemonSeeded = 0;
-    int onePieceSeeded = 0;
-    var knownEmpty = GetKnownEmptySetIds();
-
-    try
-    {
-        var seriesList = await setsHttpClient.GetFromJsonAsync<List<TcgdexSeriesBrief>>(
-            "https://api.eu1.tcgdex.net/v2/en/series"
-        );
-
-        if (seriesList != null)
-        {
-            var seriesDetailTasks = seriesList.Select(async s => {
-                try
-                {
-                    return await setsHttpClient.GetFromJsonAsync<TcgdexSeriesFull>(
-                        $"https://api.eu1.tcgdex.net/v2/en/series/{s.Id}"
-                    );
-                }
-                catch
-                {
-                    return null;
-                }
-            });
-            var seriesDetails = await Task.WhenAll(seriesDetailTasks);
-
-            var orderedSeries = seriesDetails
-                .Where(s => s != null)
-                .OrderBy(s => {
-                    int idx = pokemonSeriesOrder.FindIndex(era =>
-                        s!.Name.Contains(era, StringComparison.OrdinalIgnoreCase));
-                    return idx == -1 ? int.MaxValue : idx;
-                });
-
-            int order = 0;
-            foreach (var series in orderedSeries)
-            {
-                var setsInSeries = (series!.Sets ?? new List<TcgdexSetBrief>())
-                    .Where(set => (set.CardCount?.Total ?? 0) > 0)
-                    .Where(set => !knownEmpty.Contains(set.Id))
-                    .OrderBy(set => ApiSync.ExtractSetNumber(set.Id));
-
-                foreach (var set in setsInSeries)
-                {
-                    var insertCommand = connection.CreateCommand();
-                    insertCommand.CommandText = @"
-                        INSERT OR REPLACE INTO SetCatalog (id, name, game, sort_order)
-                        VALUES ($id, $name, $game, $order)
-                    ";
-                    insertCommand.Parameters.AddWithValue("$id", set.Id);
-                    insertCommand.Parameters.AddWithValue("$name", set.Name);
-                    insertCommand.Parameters.AddWithValue("$game", "Pokémon");
-                    insertCommand.Parameters.AddWithValue("$order", order++);
-                    insertCommand.ExecuteNonQuery();
-                    totalSeeded++;
-                    pokemonSeeded++;
-                }
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Seed error (Pokémon): {ex.GetType().Name} - {ex.Message}");
-    }
-
-    try
-    {
-        var response = await setsHttpClient.GetFromJsonAsync<List<OptcgSet>>(
-            "https://optcgapi.com/api/allSets/"
-        );
-
-        if (response != null)
-        {
-            int order = 0;
-            foreach (var set in response.Where(s => !knownEmpty.Contains(s.SetId)))
-            {
-                var insertCommand = connection.CreateCommand();
-                insertCommand.CommandText = @"
-                    INSERT OR REPLACE INTO SetCatalog (id, name, game, sort_order)
-                    VALUES ($id, $name, $game, $order)
-                ";
-                insertCommand.Parameters.AddWithValue("$id", set.SetId);
-                insertCommand.Parameters.AddWithValue("$name", set.SetName);
-                insertCommand.Parameters.AddWithValue("$game", "One Piece");
-                insertCommand.Parameters.AddWithValue("$order", order++);
-                insertCommand.ExecuteNonQuery();
-                totalSeeded++;
-                onePieceSeeded++;
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Seed error (One Piece): {ex.GetType().Name} - {ex.Message}");
-    }
-
-    int yuGiOhSeeded = 0;
-    try
-    {
-        var ygoSets = await setsHttpClient.GetFromJsonAsync<List<YgoCardSetListing>>(
-            "https://db.ygoprodeck.com/api/v7/cardsets.php"
-        );
-
-        if (ygoSets != null)
-        {
-            var orderedYgoSets = ygoSets
-                .Where(s => !knownEmpty.Contains(s.SetName))
-                .OrderBy(s => s.TcgDate ?? "9999-99-99"); // undated sets sort last
-
-            int order = 0;
-            foreach (var set in orderedYgoSets)
-            {
-                var insertCommand = connection.CreateCommand();
-                insertCommand.CommandText = @"
-                    INSERT OR REPLACE INTO SetCatalog (id, name, game, sort_order)
-                    VALUES ($id, $name, $game, $order)
-                ";
-                // YGOPRODeck identifies sets by name, not a separate code —
-                // this same string gets passed to cardinfo.php?cardset=...
-                // later, so it has to match exactly.
-                insertCommand.Parameters.AddWithValue("$id", set.SetName);
-                insertCommand.Parameters.AddWithValue("$name", set.SetName);
-                insertCommand.Parameters.AddWithValue("$game", "Yu-Gi-Oh");
-                insertCommand.Parameters.AddWithValue("$order", order++);
-                insertCommand.ExecuteNonQuery();
-                totalSeeded++;
-                yuGiOhSeeded++;
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Seed error (Yu-Gi-Oh): {ex.GetType().Name} - {ex.Message}");
-    }
-
-    return new {
-        message = $"Seeded {totalSeeded} sets total",
-        pokemon = pokemonSeeded,
-        onePiece = onePieceSeeded,
-        yuGiOh = yuGiOhSeeded
-    };
-}
-
-app.MapPost("/api/admin/seed-catalog", async () => Results.Ok(await SeedCatalogAsync()));
-
-// Separate from SeedCatalogAsync (SQLite) on purpose — reuses the same
-// proven fetch logic, but writes to DynamoDB instead. Keeping this fully
-// separate means the working SQLite path is never at risk from this change.
+// Reuses the same proven fetch logic as the old SQLite version did, but
+// writes to DynamoDB instead — this is now the only seeding path.
 app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
     var allItems = new List<DynamoSetItem>();
     var knownEmpty = GetKnownEmptySetIds();
@@ -445,10 +284,6 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
 app.MapGet("/api/admin/catalog-status", () => {
     using var connection = Database.GetConnection();
 
-    var catalogCommand = connection.CreateCommand();
-    catalogCommand.CommandText = "SELECT COUNT(*) FROM SetCatalog";
-    int catalogTotal = Convert.ToInt32(catalogCommand.ExecuteScalar());
-
     var syncedCommand = connection.CreateCommand();
     syncedCommand.CommandText = "SELECT COUNT(*) FROM Sets WHERE total > 0";
     int setsSynced = Convert.ToInt32(syncedCommand.ExecuteScalar());
@@ -457,40 +292,46 @@ app.MapGet("/api/admin/catalog-status", () => {
     emptyCommand.CommandText = "SELECT COUNT(*) FROM Sets WHERE total = 0";
     int setsMarkedEmpty = Convert.ToInt32(emptyCommand.ExecuteScalar());
 
-    var remainingCommand = connection.CreateCommand();
-    remainingCommand.CommandText = @"
-        SELECT COUNT(*) FROM SetCatalog sc
-        LEFT JOIN Sets s ON sc.id = s.id
-        WHERE s.id IS NULL OR s.total = 0
-    ";
-    int remainingToSync = Convert.ToInt32(remainingCommand.ExecuteScalar());
-
     var cardsCommand = connection.CreateCommand();
     cardsCommand.CommandText = "SELECT COUNT(*) FROM Cards";
     int totalCards = Convert.ToInt32(cardsCommand.ExecuteScalar());
 
-    return Results.Ok(new { catalogTotal, setsSynced, setsMarkedEmpty, remainingToSync, totalCards });
+    return Results.Ok(new { setsSynced, setsMarkedEmpty, totalCards });
 });
 
 app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
     int limit = batchSize ?? 10;
-    using var connection = Database.GetConnection();
 
-    var command = connection.CreateCommand();
-    command.CommandText = @"
-        SELECT sc.id, sc.game FROM SetCatalog sc
-        LEFT JOIN Sets s ON sc.id = s.id
-        WHERE s.id IS NULL OR s.total = 0
-        LIMIT $limit
-    ";
-    command.Parameters.AddWithValue("$limit", limit);
-
-    var setsToSync = new List<(string Id, string Game)>();
-    using (var reader = command.ExecuteReader())
+    // The catalog now lives in DynamoDB, not SQLite — Game is the partition
+    // key, so fetching all three games means three separate Query calls,
+    // not one Scan across the whole table.
+    var allCatalogItems = new List<DynamoSetItem>();
+    foreach (var game in new[] { "Pokémon", "One Piece", "Yu-Gi-Oh" })
     {
-        while (reader.Read())
-            setsToSync.Add((reader.GetString(0), reader.GetString(1)));
+        var gameItems = await dynamoContext.QueryAsync<DynamoSetItem>(game).GetRemainingAsync();
+        allCatalogItems.AddRange(gameItems);
     }
+
+    // Sync status still lives in SQLite's Sets table — these are two
+    // separate databases now, so the "which sets still need syncing"
+    // comparison has to happen in C#, not a single SQL join.
+    using var connection = Database.GetConnection();
+    HashSet<string> GetSyncedIds()
+    {
+        var ids = new HashSet<string>();
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT id FROM Sets WHERE total > 0";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read()) ids.Add(reader.GetString(0));
+        return ids;
+    }
+
+    var syncedIds = GetSyncedIds();
+    var setsToSync = allCatalogItems
+        .Where(item => !syncedIds.Contains(item.SetID))
+        .Take(limit)
+        .Select(item => (Id: item.SetID, Game: item.Game))
+        .ToList();
 
     var results = new List<object>();
     foreach (var (setId, game) in setsToSync)
@@ -513,13 +354,8 @@ app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
         }
     }
 
-    var remainingCommand = connection.CreateCommand();
-    remainingCommand.CommandText = @"
-        SELECT COUNT(*) FROM SetCatalog sc
-        LEFT JOIN Sets s ON sc.id = s.id
-        WHERE s.id IS NULL OR s.total = 0
-    ";
-    int remaining = Convert.ToInt32(remainingCommand.ExecuteScalar());
+    var syncedIdsAfter = GetSyncedIds();
+    int remaining = allCatalogItems.Count(item => !syncedIdsAfter.Contains(item.SetID));
 
     return Results.Ok(new { synced = results, remainingSets = remaining });
 });
@@ -578,25 +414,6 @@ app.MapPut("/api/trackers/reorder", (ReorderRequest req) => {
 });
 
 Database.Initialize();
-
-// Free-tier hosts wipe ephemeral storage on spin-down/restart, which was
-// leaving the live demo empty until someone manually re-ran the seed.
-// This makes that self-healing: check once at startup, and if the
-// catalog's empty, kick off a real reseed automatically. Fire-and-forget
-// (not awaited) so a slow/degraded TCGdex doesn't delay the app actually
-// starting to listen for requests.
-using (var startupConnection = Database.GetConnection())
-{
-    var checkCommand = startupConnection.CreateCommand();
-    checkCommand.CommandText = "SELECT COUNT(*) FROM SetCatalog";
-    int catalogCount = Convert.ToInt32(checkCommand.ExecuteScalar());
-
-    if (catalogCount == 0)
-    {
-        Console.WriteLine("SetCatalog is empty on startup — auto-seeding in the background...");
-        _ = SeedCatalogAsync();
-    }
-}
 
 // Render (and most hosts) assign a port via PORT — 0.0.0.0 accepts
 // connections from outside the container, unlike localhost.
