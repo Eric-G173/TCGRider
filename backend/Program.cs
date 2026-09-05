@@ -1,10 +1,29 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using DotNetEnv;
+using Amazon;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DataModel;
+using Amazon.Runtime;
 
 Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+
+// DynamoDB client, using credentials loaded from .env — same pattern as
+// every other secret this session, never hardcoded in source.
+// AWS_REGION should be set in .env to whatever region your tables were
+// actually created in (e.g. "us-east-1") — a mismatch here doesn't error
+// clearly, it just reports tables as "not found" even though they exist.
+var awsCredentials = new BasicAWSCredentials(
+    Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID"),
+    Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY")
+);
+var awsRegion = RegionEndpoint.GetBySystemName(
+    Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1"
+);
+var dynamoClient = new AmazonDynamoDBClient(awsCredentials, awsRegion);
+var dynamoContext = new DynamoDBContext(dynamoClient);
 
 builder.Services.AddCors(options =>
 {
@@ -81,36 +100,23 @@ var pokemonSeriesOrder = new List<string> {
     "Sword & Shield", "Scarlet & Violet"
 };
 
-app.MapGet("/api/sets/pokemon", () => {
-    using var connection = Database.GetConnection();
-    var command = connection.CreateCommand();
-    command.CommandText = @"
-        SELECT id, name FROM SetCatalog
-        WHERE game = 'Pokémon'
-        ORDER BY sort_order
-    ";
-
-    var sets = new List<object>();
-    using var reader = command.ExecuteReader();
-    while (reader.Read())
-        sets.Add(new { setID = reader.GetString(0), name = reader.GetString(1) });
+app.MapGet("/api/sets/pokemon", async () => {
+    // Query on the Game partition key — fast, single-partition lookup,
+    // not a full table scan. SortOrder isn't the sort key, so ordering
+    // happens in-memory after the fetch; fine at this scale (~200 items).
+    var results = await dynamoContext.QueryAsync<DynamoSetItem>("Pokémon").GetRemainingAsync();
+    var sets = results
+        .OrderBy(s => s.SortOrder)
+        .Select(s => new { setID = s.SetID, name = s.Name });
 
     return Results.Ok(sets);
 });
 
-app.MapGet("/api/sets/onepiece", () => {
-    using var connection = Database.GetConnection();
-    var command = connection.CreateCommand();
-    command.CommandText = @"
-        SELECT id, name FROM SetCatalog
-        WHERE game = 'One Piece'
-        ORDER BY sort_order
-    ";
-
-    var sets = new List<object>();
-    using var reader = command.ExecuteReader();
-    while (reader.Read())
-        sets.Add(new { setID = reader.GetString(0), name = reader.GetString(1) });
+app.MapGet("/api/sets/onepiece", async () => {
+    var results = await dynamoContext.QueryAsync<DynamoSetItem>("One Piece").GetRemainingAsync();
+    var sets = results
+        .OrderBy(s => s.SortOrder)
+        .Select(s => new { setID = s.SetID, name = s.Name });
 
     return Results.Ok(sets);
 });
@@ -275,6 +281,128 @@ async Task<object> SeedCatalogAsync() {
 
 app.MapPost("/api/admin/seed-catalog", async () => Results.Ok(await SeedCatalogAsync()));
 
+// Separate from SeedCatalogAsync (SQLite) on purpose — reuses the same
+// proven fetch logic, but writes to DynamoDB instead. Keeping this fully
+// separate means the working SQLite path is never at risk from this change.
+app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
+    var allItems = new List<DynamoSetItem>();
+    var knownEmpty = GetKnownEmptySetIds();
+    int pokemonCount = 0, onePieceCount = 0, yuGiOhCount = 0;
+
+    try
+    {
+        var seriesList = await setsHttpClient.GetFromJsonAsync<List<TcgdexSeriesBrief>>(
+            "https://api.eu1.tcgdex.net/v2/en/series"
+        );
+
+        if (seriesList != null)
+        {
+            var seriesDetailTasks = seriesList.Select(async s => {
+                try
+                {
+                    return await setsHttpClient.GetFromJsonAsync<TcgdexSeriesFull>(
+                        $"https://api.eu1.tcgdex.net/v2/en/series/{s.Id}"
+                    );
+                }
+                catch { return null; }
+            });
+            var seriesDetails = await Task.WhenAll(seriesDetailTasks);
+
+            var orderedSeries = seriesDetails
+                .Where(s => s != null)
+                .OrderBy(s => {
+                    int idx = pokemonSeriesOrder.FindIndex(era =>
+                        s!.Name.Contains(era, StringComparison.OrdinalIgnoreCase));
+                    return idx == -1 ? int.MaxValue : idx;
+                });
+
+            int order = 0;
+            foreach (var series in orderedSeries)
+            {
+                var setsInSeries = (series!.Sets ?? new List<TcgdexSetBrief>())
+                    .Where(set => (set.CardCount?.Total ?? 0) > 0)
+                    .Where(set => !knownEmpty.Contains(set.Id))
+                    .OrderBy(set => ApiSync.ExtractSetNumber(set.Id));
+
+                foreach (var set in setsInSeries)
+                {
+                    allItems.Add(new DynamoSetItem {
+                        Game = "Pokémon", SetID = set.Id, Name = set.Name, SortOrder = order++
+                    });
+                    pokemonCount++;
+                }
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"DynamoDB seed error (Pokémon): {ex.GetType().Name} - {ex.Message}");
+    }
+
+    try
+    {
+        var response = await setsHttpClient.GetFromJsonAsync<List<OptcgSet>>(
+            "https://optcgapi.com/api/allSets/"
+        );
+
+        if (response != null)
+        {
+            int order = 0;
+            foreach (var set in response.Where(s => !knownEmpty.Contains(s.SetId)))
+            {
+                allItems.Add(new DynamoSetItem {
+                    Game = "One Piece", SetID = set.SetId, Name = set.SetName, SortOrder = order++
+                });
+                onePieceCount++;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"DynamoDB seed error (One Piece): {ex.GetType().Name} - {ex.Message}");
+    }
+
+    try
+    {
+        var ygoSets = await setsHttpClient.GetFromJsonAsync<List<YgoCardSetListing>>(
+            "https://db.ygoprodeck.com/api/v7/cardsets.php"
+        );
+
+        if (ygoSets != null)
+        {
+            var orderedYgoSets = ygoSets
+                .Where(s => !knownEmpty.Contains(s.SetName))
+                .OrderBy(s => s.TcgDate ?? "9999-99-99");
+
+            int order = 0;
+            foreach (var set in orderedYgoSets)
+            {
+                allItems.Add(new DynamoSetItem {
+                    Game = "Yu-Gi-Oh", SetID = set.SetName, Name = set.SetName, SortOrder = order++
+                });
+                yuGiOhCount++;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"DynamoDB seed error (Yu-Gi-Oh): {ex.GetType().Name} - {ex.Message}");
+    }
+
+    // The SDK's high-level batch write handles chunking into DynamoDB's
+    // real 25-items-per-call limit internally — no manual chunking needed.
+    var batch = dynamoContext.CreateBatchWrite<DynamoSetItem>();
+    batch.AddPutItems(allItems);
+    await batch.ExecuteAsync();
+
+    return Results.Ok(new {
+        message = $"Wrote {allItems.Count} sets to DynamoDB",
+        pokemon = pokemonCount,
+        onePiece = onePieceCount,
+        yuGiOh = yuGiOhCount
+    });
+});
+
 app.MapGet("/api/cards/{setId}", (string setId) => {
     using var connection = Database.GetConnection();
     var command = connection.CreateCommand();
@@ -420,19 +548,11 @@ app.MapPost("/api/sync/yugioh/{setId}", async (string setId) => {
     });
 });
 
-app.MapGet("/api/sets/yugioh", () => {
-    using var connection = Database.GetConnection();
-    var command = connection.CreateCommand();
-    command.CommandText = @"
-        SELECT id, name FROM SetCatalog
-        WHERE game = 'Yu-Gi-Oh'
-        ORDER BY sort_order
-    ";
-
-    var sets = new List<object>();
-    using var reader = command.ExecuteReader();
-    while (reader.Read())
-        sets.Add(new { setID = reader.GetString(0), name = reader.GetString(1) });
+app.MapGet("/api/sets/yugioh", async () => {
+    var results = await dynamoContext.QueryAsync<DynamoSetItem>("Yu-Gi-Oh").GetRemainingAsync();
+    var sets = results
+        .OrderBy(s => s.SortOrder)
+        .Select(s => new { setID = s.SetID, name = s.Name });
 
     return Results.Ok(sets);
 });
@@ -482,3 +602,19 @@ using (var startupConnection = Database.GetConnection())
 // connections from outside the container, unlike localhost.
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 app.Run($"http://0.0.0.0:{port}");
+
+// Mirrors the SetCatalog table's shape — Game is the partition key so all
+// sets for one TCG live together, SetID is the sort key identifying each
+// one within that game.
+[DynamoDBTable("TCGRiderSetCatalog")]
+public class DynamoSetItem
+{
+    [DynamoDBHashKey("Game")]
+    public string Game { get; set; } = "";
+
+    [DynamoDBRangeKey("SetID")]
+    public string SetID { get; set; } = "";
+
+    public string Name { get; set; } = "";
+    public int SortOrder { get; set; }
+}
