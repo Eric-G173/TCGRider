@@ -131,7 +131,7 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
     try
     {
         var seriesList = await setsHttpClient.GetFromJsonAsync<List<TcgdexSeriesBrief>>(
-            "https://api.eu1.tcgdex.net/v2/en/series"
+            "https://api.tcgdex.net/v2/en/series"
         );
 
         if (seriesList != null)
@@ -140,7 +140,7 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
                 try
                 {
                     return await setsHttpClient.GetFromJsonAsync<TcgdexSeriesFull>(
-                        $"https://api.eu1.tcgdex.net/v2/en/series/{s.Id}"
+                        $"https://api.tcgdex.net/v2/en/series/{s.Id}"
                     );
                 }
                 catch { return null; }
