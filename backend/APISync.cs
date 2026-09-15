@@ -70,7 +70,7 @@ public class ApiSync
         Console.WriteLine($"Fetching cards for set: {setId}");
 
         var set = await client.GetFromJsonAsync<TcgdexSet>(
-            $"https://api.eu1.tcgdex.net/v2/en/sets/{setId}"
+            $"https://api.tcgdex.net/v2/en/sets/{setId}"
         );
 
         if (set?.Cards == null || set.Cards.Count == 0)
@@ -106,7 +106,7 @@ public class ApiSync
             try
             {
                 var fullCard = await client.GetFromJsonAsync<TcgdexCardFull>(
-                    $"https://api.eu1.tcgdex.net/v2/en/cards/{cardBrief.Id}"
+                    $"https://api.tcgdex.net/v2/en/cards/{cardBrief.Id}"
                 );
                 return (cardBrief.Id, Rarity: fullCard?.Rarity ?? "");
             }
