@@ -6,7 +6,7 @@ import DefaultGrid from '../components/tracker/DefaultGrid';
 import CardGrid from '../components/tracker/CardGrid';
 import { API_BASE_URL } from '../config';
 import { getClientId } from '../clientID';
-
+ 
 function App() {
   const [search, setSearch] = React.useState('');
   const [selectedTracker, setSelectedTracker] = React.useState(null);
@@ -17,19 +17,40 @@ function App() {
   const [pokemonLoading, setPokemonLoading] = React.useState(true);
   const [onePieceLoading, setOnePieceLoading] = React.useState(true);
   const [yugiohLoading, setYugiohLoading] = React.useState(true);
+  const [syncsRemaining, setSyncsRemaining] = React.useState(null);
+ 
+  async function loadSyncStatus() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sync-status?clientId=${getClientId()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setSyncsRemaining(data.remaining);
+    } catch (err) {
+      console.error("Failed to load sync status", err);
+    }
+  }
+ 
+  React.useEffect(() => {
+    loadSyncStatus();
+  }, []);
   const [availableSets, setAvailableSets] = React.useState([
-   ]);
-
+    {
+      game: "Topps",
+      sets: [
+        { name: "Match Attax", setID: "topps01" },
+      ]
+    }]);
+ 
   const filteredTrackers = trackers.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())
   );
-
+ 
   function addTracker(newTracker) {
     setTrackers(prev => {
       if (prev.some(t => t.setID === newTracker.setID)) return prev;
       return [...prev, newTracker];
     });
-
+ 
     fetch(`${API_BASE_URL}/api/trackers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -41,7 +62,7 @@ function App() {
       }),
     }).catch(err => console.error("Failed to save tracker", err));
   }
-
+ 
   React.useEffect(() => {
     async function loadTrackers() {
       try {
@@ -55,29 +76,35 @@ function App() {
     }
     loadTrackers();
   }, []);
-
+ 
   async function syncAndAddSet(set, game) {
     setSyncingSets(prev => new Set(prev).add(set.setID));
-
+ 
     // Each game's card data lives behind a different sync endpoint —
     // route based on which game group this set came from.
-   const endpoint = game === "One Piece"
-  ? `${API_BASE_URL}/api/sync/onepiece/${encodeURIComponent(set.setID)}`
-  : game === "Yu-Gi-Oh"
-  ? `${API_BASE_URL}/api/sync/yugioh/${encodeURIComponent(set.setID)}`
-  : `${API_BASE_URL}/api/sync/${encodeURIComponent(set.setID)}`;
-
+    const endpoint = game === "One Piece"
+      ? `${API_BASE_URL}/api/sync/onepiece/${encodeURIComponent(set.setID)}?clientId=${getClientId()}`
+      : game === "Yu-Gi-Oh"
+      ? `${API_BASE_URL}/api/sync/yugioh/${encodeURIComponent(set.setID)}?clientId=${getClientId()}`
+      : `${API_BASE_URL}/api/sync/${encodeURIComponent(set.setID)}?clientId=${getClientId()}`;
+ 
     try {
       const res = await fetch(endpoint, { method: 'POST' });
-      if (!res.ok) throw new Error(`Sync failed: HTTP ${res.status}`);
-
       const data = await res.json();
+ 
+      if (res.status === 429 || data.limitReached) {
+        alert(data.message || "Daily sync limit reached. Try again later.");
+        return;
+      }
+      if (!res.ok) throw new Error(`Sync failed: HTTP ${res.status}`);
+ 
       if (!data.hasCards) {
         console.warn(`Set ${set.setID} has no card data — not adding as tracker`);
         return;
       }
-
+ 
       addTracker({ name: set.name, setID: set.setID, game });
+      loadSyncStatus();
     } catch (err) {
       console.error(`Failed to sync set ${set.setID}`, err);
     } finally {
@@ -88,7 +115,7 @@ function App() {
       });
     }
   }
-
+ 
   React.useEffect(() => {
     let cancelled = false;
     async function loadPokemonSets() {
@@ -96,9 +123,9 @@ function App() {
         const res = await fetch(`${API_BASE_URL}/api/sets/pokemon`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const sets = await res.json();
-
+ 
         if (cancelled) return;
-
+ 
         setAvailableSets(prev => {
           const others = prev.filter(g => g.game !== "Pokémon");
           return [{ game: "Pokémon", sets }, ...others];
@@ -109,11 +136,11 @@ function App() {
         if (!cancelled) setPokemonLoading(false);
       }
     }
-
+ 
     loadPokemonSets();
     return () => { cancelled = true; };
   }, []);
-
+ 
   React.useEffect(() => {
     let cancelled = false;
     async function loadOnePieceSets() {
@@ -121,9 +148,9 @@ function App() {
         const res = await fetch(`${API_BASE_URL}/api/sets/onepiece`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const sets = await res.json();
-
+ 
         if (cancelled) return;
-
+ 
         setAvailableSets(prev => {
           const others = prev.filter(g => g.game !== "One Piece");
           return [{ game: "One Piece", sets }, ...others];
@@ -134,11 +161,11 @@ function App() {
         if (!cancelled) setOnePieceLoading(false);
       }
     }
-
+ 
     loadOnePieceSets();
     return () => { cancelled = true; };
   }, []);
-
+ 
   React.useEffect(() => {
     let cancelled = false;
     async function loadYuGiOhSets() {
@@ -146,9 +173,9 @@ function App() {
         const res = await fetch(`${API_BASE_URL}/api/sets/yugioh`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const sets = await res.json();
-
+ 
         if (cancelled) return;
-
+ 
         setAvailableSets(prev => {
           const others = prev.filter(g => g.game !== "Yu-Gi-Oh");
           return [{ game: "Yu-Gi-Oh", sets }, ...others];
@@ -159,32 +186,38 @@ function App() {
         if (!cancelled) setYugiohLoading(false);
       }
     }
-
+ 
     loadYuGiOhSets();
     return () => { cancelled = true; };
   }, []);
-
+ 
   return (
     <div className={styles.App}>
       <TopBar search={search} setSearch={setSearch} />
-
+ 
       <div className={styles['App-body']}>
         <Sidebar setView={setView} filteredTrackers={filteredTrackers} selectedTracker={selectedTracker} setSelectedTracker={setSelectedTracker} setTrackers={setTrackers} />
-
+ 
         <main className={styles['App-content']}>
           {view === 'tracker' && selectedTracker !== null ? (
-            <CardGrid tracker={trackers.find(t => t.setID === selectedTracker)} />
+            <CardGrid key={selectedTracker} tracker={trackers.find(t => t.setID === selectedTracker)} />
           ) : view === 'browse' ? (
             <div className={styles['browse-view']}>
+              {syncsRemaining !== null && (
+                <div className={styles['sync-limit-banner']}>
+                  {syncsRemaining} sync{syncsRemaining === 1 ? '' : 's'} remaining today
+                </div>
+              )}
               {selectedGame === null ? (
                 <div className={styles['game-link-list']}>
                   {pokemonLoading && <div className={styles['game-link-skeleton']}>Pokémon</div>}
                   {onePieceLoading && <div className={styles['game-link-skeleton']}>One Piece</div>}
                   {yugiohLoading && <div className={styles['game-link-skeleton']}>Yu-Gi-Oh</div>}
-                  {availableSets.map((group, i) => (
+                  {availableSets.map((group) => (
                     <div
                       className={styles['game-link']}
-                      key={i}
+                      data-testid={`game-link-${group.game}`}
+                      key={group.game}
                       onClick={() => setSelectedGame(group.game)}
                     >
                       {group.game}
@@ -223,9 +256,9 @@ function App() {
           )}
         </main>
       </div>
-
+ 
     </div>
   );
 }
-
+ 
 export default App;
