@@ -17,8 +17,29 @@ function App() {
   const [pokemonLoading, setPokemonLoading] = React.useState(true);
   const [onePieceLoading, setOnePieceLoading] = React.useState(true);
   const [yugiohLoading, setYugiohLoading] = React.useState(true);
+  const [syncsRemaining, setSyncsRemaining] = React.useState(null);
+
+  async function loadSyncStatus() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sync-status?clientId=${getClientId()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setSyncsRemaining(data.remaining);
+    } catch (err) {
+      console.error("Failed to load sync status", err);
+    }
+  }
+
+  React.useEffect(() => {
+    loadSyncStatus();
+  }, []);
   const [availableSets, setAvailableSets] = React.useState([
-   ]);
+    {
+      game: "Topps",
+      sets: [
+        { name: "Match Attax", setID: "topps01" },
+      ]
+    }]);
 
   const filteredTrackers = trackers.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())
@@ -61,23 +82,29 @@ function App() {
 
     // Each game's card data lives behind a different sync endpoint —
     // route based on which game group this set came from.
-   const endpoint = game === "One Piece"
-  ? `${API_BASE_URL}/api/sync/onepiece/${encodeURIComponent(set.setID)}`
-  : game === "Yu-Gi-Oh"
-  ? `${API_BASE_URL}/api/sync/yugioh/${encodeURIComponent(set.setID)}`
-  : `${API_BASE_URL}/api/sync/${encodeURIComponent(set.setID)}`;
+    const endpoint = game === "One Piece"
+      ? `${API_BASE_URL}/api/sync/onepiece/${encodeURIComponent(set.setID)}?clientId=${getClientId()}`
+      : game === "Yu-Gi-Oh"
+      ? `${API_BASE_URL}/api/sync/yugioh/${encodeURIComponent(set.setID)}?clientId=${getClientId()}`
+      : `${API_BASE_URL}/api/sync/${encodeURIComponent(set.setID)}?clientId=${getClientId()}`;
 
     try {
       const res = await fetch(endpoint, { method: 'POST' });
+      const data = await res.json();
+
+      if (res.status === 429 || data.limitReached) {
+        alert(data.message || "Daily sync limit reached. Try again later.");
+        return;
+      }
       if (!res.ok) throw new Error(`Sync failed: HTTP ${res.status}`);
 
-      const data = await res.json();
       if (!data.hasCards) {
         console.warn(`Set ${set.setID} has no card data — not adding as tracker`);
         return;
       }
 
       addTracker({ name: set.name, setID: set.setID, game });
+      loadSyncStatus();
     } catch (err) {
       console.error(`Failed to sync set ${set.setID}`, err);
     } finally {
@@ -173,9 +200,14 @@ function App() {
 
         <main className={styles['App-content']}>
           {view === 'tracker' && selectedTracker !== null ? (
-            <CardGrid tracker={trackers.find(t => t.setID === selectedTracker)} />
+            <CardGrid key={selectedTracker} tracker={trackers.find(t => t.setID === selectedTracker)} />
           ) : view === 'browse' ? (
             <div className={styles['browse-view']}>
+              {syncsRemaining !== null && (
+                <div className={styles['sync-limit-banner']}>
+                  {syncsRemaining} sync{syncsRemaining === 1 ? '' : 's'} remaining today
+                </div>
+              )}
               {selectedGame === null ? (
                 <div className={styles['game-link-list']}>
                   {pokemonLoading && <div className={styles['game-link-skeleton']}>Pokémon</div>}
@@ -184,6 +216,7 @@ function App() {
                   {availableSets.map((group, i) => (
                     <div
                       className={styles['game-link']}
+                      data-testid={`game-link-${group.game}`}
                       key={i}
                       onClick={() => setSelectedGame(group.game)}
                     >
