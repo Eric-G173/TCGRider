@@ -54,3 +54,70 @@ jobs:
 
       - name: Test
         run: npm test -- --watchAll=false
+
+  e2e:
+    name: Playwright E2E tests
+    runs-on: ubuntu-latest
+    # NOTE: this job's first sync of any never-before-tested set is a real
+    # live call to TCGdex — CI always starts with an empty database, no way
+    # around that. We've directly experienced TCGdex having real, multi-day
+    # outages this project. If this job ever fails specifically waiting on
+    # the "Jungle" tracker button (not the earlier setup steps), that's the
+    # likely cause, not a real regression — worth checking
+    # https://tcgdex.dev/status before assuming the app broke.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Restore and build backend
+        working-directory: backend
+        run: |
+          dotnet restore
+          dotnet build
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install --with-deps
+
+      - name: Start backend
+        working-directory: backend
+        run: dotnet run &
+
+      - name: Start frontend
+        working-directory: frontend
+        run: npm start &
+
+      - name: Wait for both servers to be ready
+        run: |
+          npx wait-on http://localhost:5000/ping
+          npx wait-on http://localhost:3000
+
+      - name: Run Playwright tests
+        working-directory: e2e
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 30
