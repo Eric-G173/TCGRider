@@ -115,6 +115,14 @@ jobs:
           npx wait-on http://localhost:5000/ping
           npx wait-on http://localhost:3000
 
+      - name: Dump backend/frontend logs if the wait above failed
+        if: failure()
+        run: |
+          echo "=== backend.log ==="
+          cat /tmp/backend.log || echo "(no backend.log found)"
+          echo "=== frontend.log ==="
+          cat /tmp/frontend.log || echo "(no frontend.log found)"
+
       - name: Run Playwright tests
         working-directory: e2e
         run: npx playwright test
