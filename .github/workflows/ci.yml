@@ -122,9 +122,23 @@ jobs:
           curl -v --max-time 5 http://127.0.0.1:5000/ping || echo "curl exited with code $?"
       - name: Wait for both servers to be ready
         run: |
-          sleep 10
-          npx wait-on http://127.0.0.1:5000/ping --timeout 30000
-          npx wait-on http://127.0.0.1:3000 --timeout 30000
+          echo "Waiting for backend..."
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:5000/ping > /dev/null; then
+              echo "Backend is up (attempt $i)"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for frontend..."
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:3000 > /dev/null; then
+              echo "Frontend is up (attempt $i)"
+              break
+            fi
+            sleep 2
+          done
 
       - name: Dump backend/frontend logs if the wait above failed
         if: failure()
