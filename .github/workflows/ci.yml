@@ -100,7 +100,7 @@ jobs:
 
       - name: Start backend
         working-directory: backend
-        run: nohup dotnet run > /tmp/backend.log 2>&1 &
+        run: nohup dotnet bin/Debug/net10.0/TCGRider.Api.dll > /tmp/backend.log 2>&1 &
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -110,10 +110,26 @@ jobs:
         working-directory: frontend
         run: nohup npm start > /tmp/frontend.log 2>&1 &
 
+      
       - name: Wait for both servers to be ready
         run: |
-          npx wait-on http://localhost:5000/ping --timeout 30000
-          npx wait-on http://localhost:3000 --timeout 30000
+          echo "Waiting for backend..."
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:5000/ping > /dev/null; then
+              echo "Backend is up (attempt $i)"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for frontend..."
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:3000 > /dev/null; then
+              echo "Frontend is up (attempt $i)"
+              break
+            fi
+            sleep 2
+          done
 
       - name: Dump backend/frontend logs if the wait above failed
         if: failure()
