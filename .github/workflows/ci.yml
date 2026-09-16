@@ -100,7 +100,7 @@ jobs:
 
       - name: Start backend
         working-directory: backend
-        run: nohup dotnet run > /tmp/backend.log 2>&1 &
+        run: nohup dotnet bin/Debug/net10.0/TCGRider.Api.dll > /tmp/backend.log 2>&1 &
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
