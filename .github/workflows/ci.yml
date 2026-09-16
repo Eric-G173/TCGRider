@@ -100,9 +100,7 @@ jobs:
 
       - name: Start backend
         working-directory: backend
-        run: dotnet run &
-
-
+        run: nohup dotnet run > /tmp/backend.log 2>&1 &
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -110,7 +108,7 @@ jobs:
 
       - name: Start frontend
         working-directory: frontend
-        run: npm start &
+        run: nohup npm start > /tmp/frontend.log 2>&1 &
 
       - name: Wait for both servers to be ready
         run: |
@@ -127,4 +125,3 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 30
-          
