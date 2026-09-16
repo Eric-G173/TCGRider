@@ -110,16 +110,7 @@ jobs:
         working-directory: frontend
         run: nohup npm start > /tmp/frontend.log 2>&1 &
 
-      - name: Diagnose backend process and connectivity
-        run: |
-          echo "=== Waiting 10s to rule out a timing issue ==="
-          sleep 10
-          echo "=== Is dotnet still running? ==="
-          ps aux | grep dotnet || echo "(no dotnet process found)"
-          echo "=== ALL listening ports (no filter) ==="
-          ss -tlnp
-          echo "=== Raw curl attempt ==="
-          curl -v --max-time 5 http://127.0.0.1:5000/ping || echo "curl exited with code $?"
+      
       - name: Wait for both servers to be ready
         run: |
           echo "Waiting for backend..."
