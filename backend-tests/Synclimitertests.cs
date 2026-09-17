@@ -12,25 +12,25 @@ public class SyncLimiterTests
         var result = SyncLimiter.CheckAndIncrement(clientId);
 
         Assert.True(result.Allowed);
-        Assert.Equal(9, result.RemainingToday); // 10 - 1
+        Assert.Equal(29, result.RemainingToday); // 30 - 1
 
         Cleanup(clientId);
     }
 
     [Fact]
-    public void EleventhSync_WithinWindow_IsRejected()
+    public void ThirtyFirstSync_WithinWindow_IsRejected()
     {
         var clientId = Guid.NewGuid().ToString();
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 30; i++)
         {
             SyncLimiter.CheckAndIncrement(clientId);
         }
 
-        var eleventh = SyncLimiter.CheckAndIncrement(clientId);
+        var thirtyFirst = SyncLimiter.CheckAndIncrement(clientId);
 
-        Assert.False(eleventh.Allowed);
-        Assert.Equal(0, eleventh.RemainingToday);
+        Assert.False(thirtyFirst.Allowed);
+        Assert.Equal(0, thirtyFirst.RemainingToday);
 
         Cleanup(clientId);
     }

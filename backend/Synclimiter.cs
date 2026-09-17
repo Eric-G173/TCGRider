@@ -2,8 +2,8 @@ using Microsoft.Data.Sqlite;
 
 public static class SyncLimiter
 {
-    private const int SyncLimit = 10;
-    private static readonly TimeSpan WindowDuration = TimeSpan.FromHours(4);
+    private const int SyncLimit = 30;
+    private static readonly TimeSpan WindowDuration = TimeSpan.FromHours(24);
 
     public record LimitStatus(bool Allowed, int RemainingToday, DateTime ResetsAt);
 
