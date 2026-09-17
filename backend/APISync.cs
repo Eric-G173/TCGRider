@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using System.IO;
 using System.Linq;
+using Amazon.DynamoDBv2.DataModel;
 
 public class ApiSync
 {
@@ -33,6 +34,19 @@ public class ApiSync
         return reader.GetInt32(0) > 0;
     }
 
+    // Pokemon/One Piece specific — checks DynamoDB, the thing that
+    // actually survives a redeploy, instead of SQLite. Yu-Gi-Oh must keep
+    // using SetAlreadySynced above, completely unchanged — its cards were
+    // deliberately kept out of this migration, since its image-storage
+    // question is still unresolved.
+    public static async Task<bool> SetAlreadySyncedInDynamo(DynamoDBContext dynamoContext, string setId)
+    {
+        var results = await dynamoContext.QueryAsync<DynamoCardItem>(setId).GetRemainingAsync();
+        if (results.Count == 0) return false; // never attempted at all
+        if (results.Count == 1 && results[0].CardID == "__EMPTY__") return false; // attempted, confirmed empty
+        return true;
+    }
+
     // Records that a set was actually attempted and confirmed to have no
     // cards — this is what lets /api/sets/* permanently filter it out of
     // the browse list going forward, since TCGdex's own cardCount metadata
@@ -59,24 +73,37 @@ public class ApiSync
     // just freshly synced or already in the DB), false if TCGdex has no
     // cards for it — the frontend uses this to decide whether to add it as
     // a tracker at all.
-    public static async Task<bool> SyncPokemonSet(string setId)
+    public static async Task<bool> SyncPokemonSet(string setId, DynamoDBContext dynamoContext)
     {
-        if (SetAlreadySynced(setId))
+        if (await SetAlreadySyncedInDynamo(dynamoContext, setId))
         {
-            Console.WriteLine($"Set {setId} already synced — skipping API fetch");
+            Console.WriteLine($"Set {setId} already synced (DynamoDB) — skipping API fetch");
             return true;
         }
 
         Console.WriteLine($"Fetching cards for set: {setId}");
 
         var set = await client.GetFromJsonAsync<TcgdexSet>(
-            $"https://api.tcgdex.net/v2/en/sets/{setId}"
+            $"https://api.eu1.tcgdex.net/v2/en/sets/{setId}"
         );
 
         if (set?.Cards == null || set.Cards.Count == 0)
         {
             Console.WriteLine($"Set {setId} has no card data available — marking as empty");
             MarkSetAsEmpty(setId, set?.Name ?? setId);
+
+            // Dual-write: same __EMPTY__ sentinel pattern as a real card
+            // list, so DynamoDB also remembers this was checked, not just
+            // never attempted.
+            try
+            {
+                await dynamoContext.SaveAsync(new DynamoCardItem { SetID = setId, CardID = "__EMPTY__" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"DynamoDB dual-write (empty marker) failed for {setId}: {ex.Message}");
+            }
+
             return false;
         }
 
@@ -106,7 +133,7 @@ public class ApiSync
             try
             {
                 var fullCard = await client.GetFromJsonAsync<TcgdexCardFull>(
-                    $"https://api.tcgdex.net/v2/en/cards/{cardBrief.Id}"
+                    $"https://api.eu1.tcgdex.net/v2/en/cards/{cardBrief.Id}"
                 );
                 return (cardBrief.Id, Rarity: fullCard?.Rarity ?? "");
             }
@@ -124,11 +151,19 @@ public class ApiSync
         var rarityResults = await Task.WhenAll(rarityTasks);
         var rarityById = rarityResults.ToDictionary(r => r.Id, r => r.Rarity);
 
+        // Dual-write: identical card data goes to both SQLite (the existing
+        // read path — completely unchanged) and this list, batched to
+        // DynamoDB once the loop finishes. Purely additive right now — the
+        // app doesn't read from here yet; that switch is a deliberate,
+        // separate next step, not part of this one.
+        var dynamoItems = new List<DynamoCardItem>();
+
         int count = 0;
         foreach (var cardBrief in set.Cards)
         {
             count++;
             string rarity = rarityById.TryGetValue(cardBrief.Id, out var r) ? r : "";
+            string imageUrl = cardBrief.Image != null ? $"{cardBrief.Image}/low.png" : "";
 
             var command = connection.CreateCommand();
             command.CommandText = @"
@@ -139,12 +174,41 @@ public class ApiSync
             command.Parameters.AddWithValue("$setId", setId);
             command.Parameters.AddWithValue("$name", cardBrief.Name);
             command.Parameters.AddWithValue("$number", cardBrief.LocalId);
-            command.Parameters.AddWithValue("$imageUrl", cardBrief.Image != null ? $"{cardBrief.Image}/low.png" : "");
+            command.Parameters.AddWithValue("$imageUrl", imageUrl);
             command.Parameters.AddWithValue("$rarity", rarity);
             command.ExecuteNonQuery();
 
+            dynamoItems.Add(new DynamoCardItem
+            {
+                SetID = setId,
+                CardID = cardBrief.Id,
+                Name = cardBrief.Name,
+                Number = cardBrief.LocalId,
+                ImageUrl = imageUrl,
+                Rarity = rarity
+            });
+
             if (count % 20 == 0)
                 Console.WriteLine($"  ...{count}/{set.Cards.Count} cards processed");
+        }
+
+        try
+        {
+            // TCGdex itself hasn't shown this, but deduplicating defensively
+            // rather than assuming — DynamoDB's batch write rejects any
+            // duplicate key outright, unlike SQLite's silent INSERT OR
+            // IGNORE, so this needs to be explicit here.
+            var uniqueDynamoItems = dynamoItems.DistinctBy(item => item.CardID).ToList();
+            var batch = dynamoContext.CreateBatchWrite<DynamoCardItem>();
+            batch.AddPutItems(uniqueDynamoItems);
+            await batch.ExecuteAsync();
+            Console.WriteLine($"Dual-wrote {uniqueDynamoItems.Count} cards to DynamoDB for set {setId}");
+        }
+        catch (Exception ex)
+        {
+            // Not fatal — SQLite (the existing, still-in-use read path)
+            // already succeeded above regardless of this outcome.
+            Console.WriteLine($"DynamoDB dual-write failed for set {setId}: {ex.Message}");
         }
 
         Console.WriteLine($"Synced {set.Cards.Count} cards for set {setId}");
@@ -155,11 +219,11 @@ public class ApiSync
     // ONE PIECE (OPTCG API)
     // ─────────────────────────────────────────
 
-    public static async Task<bool> SyncOnePieceSet(string setId)
+    public static async Task<bool> SyncOnePieceSet(string setId, DynamoDBContext dynamoContext)
     {
-        if (SetAlreadySynced(setId))
+        if (await SetAlreadySyncedInDynamo(dynamoContext, setId))
         {
-            Console.WriteLine($"Set {setId} already synced — skipping API fetch");
+            Console.WriteLine($"Set {setId} already synced (DynamoDB) — skipping API fetch");
             return true;
         }
 
@@ -173,6 +237,16 @@ public class ApiSync
         {
             Console.WriteLine($"Set {setId} has no card data available — marking as empty");
             MarkSetAsEmpty(setId, setId); // OPTCG's set list endpoint doesn't return a name on empty results
+
+            try
+            {
+                await dynamoContext.SaveAsync(new DynamoCardItem { SetID = setId, CardID = "__EMPTY__" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"DynamoDB dual-write (empty marker) failed for {setId}: {ex.Message}");
+            }
+
             return false;
         }
 
@@ -189,6 +263,8 @@ public class ApiSync
         setCommand.Parameters.AddWithValue("$lastSynced", DateTime.UtcNow.ToString("o"));
         setCommand.ExecuteNonQuery();
 
+        var dynamoItems = new List<DynamoCardItem>();
+
         int count = 0;
         foreach (var card in cards)
         {
@@ -197,6 +273,8 @@ public class ApiSync
             string cardNumber = card.CardSetId.Contains('-')
                 ? card.CardSetId.Split('-')[1]
                 : card.CardSetId;
+            string imageUrl = card.CardImage ?? "";
+            string rarity = card.Rarity ?? "";
 
             var command = connection.CreateCommand();
             command.CommandText = @"
@@ -207,19 +285,48 @@ public class ApiSync
             command.Parameters.AddWithValue("$setId", setId);
             command.Parameters.AddWithValue("$name", card.CardName);
             command.Parameters.AddWithValue("$number", cardNumber);
-            command.Parameters.AddWithValue("$imageUrl", card.CardImage ?? "");
-            command.Parameters.AddWithValue("$rarity", card.Rarity ?? "");
+            command.Parameters.AddWithValue("$imageUrl", imageUrl);
+            command.Parameters.AddWithValue("$rarity", rarity);
             command.ExecuteNonQuery();
+
+            dynamoItems.Add(new DynamoCardItem
+            {
+                SetID = setId,
+                CardID = card.CardSetId,
+                Name = card.CardName,
+                Number = cardNumber,
+                ImageUrl = imageUrl,
+                Rarity = rarity
+            });
 
             if (count % 20 == 0)
                 Console.WriteLine($"  ...{count}/{cards.Count} cards processed");
+        }
+
+        try
+        {
+            // OPTCG has confirmed duplicate card_set_id values within a
+            // single set's response — SQLite's INSERT OR IGNORE silently
+            // absorbed this, but DynamoDB's batch write rejects any
+            // duplicate key outright. This is the actual fix for the real
+            // "item with the same key has already been added" error seen
+            // on set EB-02.
+            var uniqueDynamoItems = dynamoItems.DistinctBy(item => item.CardID).ToList();
+            var batch = dynamoContext.CreateBatchWrite<DynamoCardItem>();
+            batch.AddPutItems(uniqueDynamoItems);
+            await batch.ExecuteAsync();
+            Console.WriteLine($"Dual-wrote {uniqueDynamoItems.Count} cards to DynamoDB for set {setId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DynamoDB dual-write failed for set {setId}: {ex.Message}");
         }
 
         Console.WriteLine($"Synced {cards.Count} cards for One Piece set {setId}");
         return true;
     }
 
-    // YGOPRODeck rate limit is 20 req/sec with a 1-hour block if exceeded —
+// YGOPRODeck rate limit is 20 req/sec with a 1-hour block if exceeded —
     // a much harsher, more explicit penalty than TCGdex/OPTCG documented.
     // Downloads here are deliberately SEQUENTIAL, not parallel like the
     // TCGdex rarity fetch — a single request naturally takes longer than
