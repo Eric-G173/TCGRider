@@ -5,11 +5,11 @@ using Amazon;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.Runtime;
-
+ 
 Env.Load();
-
+ 
 var builder = WebApplication.CreateBuilder(args);
-
+ 
 // DynamoDB client, using credentials loaded from .env — same pattern as
 // every other secret this session, never hardcoded in source.
 // AWS_REGION should be set in .env to whatever region your tables were
@@ -24,33 +24,33 @@ var awsRegion = RegionEndpoint.GetBySystemName(
 );
 var dynamoClient = new AmazonDynamoDBClient(awsCredentials, awsRegion);
 var dynamoContext = new DynamoDBContext(dynamoClient);
-
+ 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
         var allowedOrigins = new List<string> { "http://localhost:3000" };
-
+ 
         // Set this on Render once your frontend's real URL is known —
         // avoids needing another code deploy just to update CORS.
         var deployedOrigin = Environment.GetEnvironmentVariable("FRONTEND_URL");
         if (!string.IsNullOrEmpty(deployedOrigin))
             allowedOrigins.Add(deployedOrigin);
-
+ 
         policy.WithOrigins(allowedOrigins.ToArray())
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
 });
-
+ 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
-
+ 
 var app = builder.Build();
 app.UseCors("AllowReactApp");
-
+ 
 // Serves downloaded Yu-Gi-Oh card images back out over HTTP. A file saved
 // at card-images/yugioh/12345.jpg becomes reachable at
 // {API_BASE_URL}/card-images/yugioh/12345.jpg — this is what makes
@@ -62,7 +62,7 @@ app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(cardImagesPath),
     RequestPath = "/card-images"
 });
-
+ 
 // shared client — now used ONLY by the one-time /api/admin/seed-dynamodb-catalog
 // endpoint, since the browse routes read from DynamoDB directly. A longer
 // timeout is fine here: nothing user-facing waits on this anymore, and
@@ -72,7 +72,7 @@ var setsHttpClient = new HttpClient
 {
     Timeout = TimeSpan.FromSeconds(90)
 };
-
+ 
 // Sets get marked here (total = 0) once a real sync attempt confirms they
 // have no actual card data — TCGdex/OPTCG's own listing metadata isn't
 // reliable enough to catch this upfront, so this filters based on what's
@@ -88,9 +88,9 @@ HashSet<string> GetKnownEmptySetIds()
         ids.Add(reader.GetString(0));
     return ids;
 }
-
+ 
 app.MapGet("/ping", () => Results.Ok(new { status = "ok", message = "C# backend running" }));
-
+ 
 // Known chronological order of TCG eras — TCGdex's own series listing isn't
 // guaranteed to come back in release order, so sets are sorted using this
 // reference list instead of trusting API return order.
@@ -99,7 +99,7 @@ var pokemonSeriesOrder = new List<string> {
     "Platinum", "HeartGold", "Black & White", "XY", "Sun & Moon",
     "Sword & Shield", "Scarlet & Violet"
 };
-
+ 
 app.MapGet("/api/sets/pokemon", async () => {
     // Query on the Game partition key — fast, single-partition lookup,
     // not a full table scan. SortOrder isn't the sort key, so ordering
@@ -108,32 +108,32 @@ app.MapGet("/api/sets/pokemon", async () => {
     var sets = results
         .OrderBy(s => s.SortOrder)
         .Select(s => new { setID = s.SetID, name = s.Name });
-
+ 
     return Results.Ok(sets);
 });
-
+ 
 app.MapGet("/api/sets/onepiece", async () => {
     var results = await dynamoContext.QueryAsync<DynamoSetItem>("One Piece").GetRemainingAsync();
     var sets = results
         .OrderBy(s => s.SortOrder)
         .Select(s => new { setID = s.SetID, name = s.Name });
-
+ 
     return Results.Ok(sets);
 });
-
+ 
 // Reuses the same proven fetch logic as the old SQLite version did, but
 // writes to DynamoDB instead — this is now the only seeding path.
 app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
     var allItems = new List<DynamoSetItem>();
     var knownEmpty = GetKnownEmptySetIds();
     int pokemonCount = 0, onePieceCount = 0, yuGiOhCount = 0;
-
+ 
     try
     {
         var seriesList = await setsHttpClient.GetFromJsonAsync<List<TcgdexSeriesBrief>>(
             "https://api.eu1.tcgdex.net/v2/en/series"
         );
-
+ 
         if (seriesList != null)
         {
             var seriesDetailTasks = seriesList.Select(async s => {
@@ -146,7 +146,7 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
                 catch { return null; }
             });
             var seriesDetails = await Task.WhenAll(seriesDetailTasks);
-
+ 
             var orderedSeries = seriesDetails
                 .Where(s => s != null)
                 .OrderBy(s => {
@@ -154,7 +154,7 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
                         s!.Name.Contains(era, StringComparison.OrdinalIgnoreCase));
                     return idx == -1 ? int.MaxValue : idx;
                 });
-
+ 
             int order = 0;
             foreach (var series in orderedSeries)
             {
@@ -162,7 +162,7 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
                     .Where(set => (set.CardCount?.Total ?? 0) > 0)
                     .Where(set => !knownEmpty.Contains(set.Id))
                     .OrderBy(set => ApiSync.ExtractSetNumber(set.Id));
-
+ 
                 foreach (var set in setsInSeries)
                 {
                     allItems.Add(new DynamoSetItem {
@@ -177,13 +177,13 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
     {
         Console.WriteLine($"DynamoDB seed error (Pokémon): {ex.GetType().Name} - {ex.Message}");
     }
-
+ 
     try
     {
         var response = await setsHttpClient.GetFromJsonAsync<List<OptcgSet>>(
             "https://optcgapi.com/api/allSets/"
         );
-
+ 
         if (response != null)
         {
             int order = 0;
@@ -200,19 +200,19 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
     {
         Console.WriteLine($"DynamoDB seed error (One Piece): {ex.GetType().Name} - {ex.Message}");
     }
-
+ 
     try
     {
         var ygoSets = await setsHttpClient.GetFromJsonAsync<List<YgoCardSetListing>>(
             "https://db.ygoprodeck.com/api/v7/cardsets.php"
         );
-
+ 
         if (ygoSets != null)
         {
             var orderedYgoSets = ygoSets
                 .Where(s => !knownEmpty.Contains(s.SetName))
                 .OrderBy(s => s.TcgDate ?? "9999-99-99");
-
+ 
             int order = 0;
             foreach (var set in orderedYgoSets)
             {
@@ -227,13 +227,13 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
     {
         Console.WriteLine($"DynamoDB seed error (Yu-Gi-Oh): {ex.GetType().Name} - {ex.Message}");
     }
-
+ 
     // The SDK's high-level batch write handles chunking into DynamoDB's
     // real 25-items-per-call limit internally — no manual chunking needed.
     var batch = dynamoContext.CreateBatchWrite<DynamoSetItem>();
     batch.AddPutItems(allItems);
     await batch.ExecuteAsync();
-
+ 
     return Results.Ok(new {
         message = $"Wrote {allItems.Count} sets to DynamoDB",
         pokemon = pokemonCount,
@@ -241,7 +241,7 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
         yuGiOh = yuGiOhCount
     });
 });
-
+ 
 app.MapGet("/api/cards/{setId}", (string setId) => {
     using var connection = Database.GetConnection();
     var command = connection.CreateCommand();
@@ -252,7 +252,7 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
         ORDER BY CAST(number AS INTEGER)
     ";
     command.Parameters.AddWithValue("$setId", setId);
-
+ 
     var cards = new List<object>();
     using var reader = command.ExecuteReader();
     while (reader.Read())
@@ -264,13 +264,13 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
             imageUrl = reader.IsDBNull(3) ? "" : reader.GetString(3)
         });
     }
-
+ 
     bool hasMissingImages = cards.Any(c => string.IsNullOrEmpty(((dynamic)c).imageUrl));
-
-
+ 
+ 
     return Results.Ok(new {cards, hasMissingImages});
 });
-
+ 
 // Bulk pre-loads full card data for every set in the catalog, so that
 // EVERY user's first-ever sync of a set is a pure DB read, not a live
 // API call. Reuses the existing SyncPokemonSet/SyncOnePieceSet logic —
@@ -283,25 +283,25 @@ app.MapGet("/api/cards/{setId}", (string setId) => {
 // picks up wherever the last call left off.
 app.MapGet("/api/admin/catalog-status", () => {
     using var connection = Database.GetConnection();
-
+ 
     var syncedCommand = connection.CreateCommand();
     syncedCommand.CommandText = "SELECT COUNT(*) FROM Sets WHERE total > 0";
     int setsSynced = Convert.ToInt32(syncedCommand.ExecuteScalar());
-
+ 
     var emptyCommand = connection.CreateCommand();
     emptyCommand.CommandText = "SELECT COUNT(*) FROM Sets WHERE total = 0";
     int setsMarkedEmpty = Convert.ToInt32(emptyCommand.ExecuteScalar());
-
+ 
     var cardsCommand = connection.CreateCommand();
     cardsCommand.CommandText = "SELECT COUNT(*) FROM Cards";
     int totalCards = Convert.ToInt32(cardsCommand.ExecuteScalar());
-
+ 
     return Results.Ok(new { setsSynced, setsMarkedEmpty, totalCards });
 });
-
+ 
 app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
     int limit = batchSize ?? 10;
-
+ 
     // The catalog now lives in DynamoDB, not SQLite — Game is the partition
     // key, so fetching all three games means three separate Query calls,
     // not one Scan across the whole table.
@@ -311,7 +311,7 @@ app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
         var gameItems = await dynamoContext.QueryAsync<DynamoSetItem>(game).GetRemainingAsync();
         allCatalogItems.AddRange(gameItems);
     }
-
+ 
     // Sync status still lives in SQLite's Sets table — these are two
     // separate databases now, so the "which sets still need syncing"
     // comparison has to happen in C#, not a single SQL join.
@@ -325,14 +325,14 @@ app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
         while (reader.Read()) ids.Add(reader.GetString(0));
         return ids;
     }
-
+ 
     var syncedIds = GetSyncedIds();
     var setsToSync = allCatalogItems
         .Where(item => !syncedIds.Contains(item.SetID))
         .Take(limit)
         .Select(item => (Id: item.SetID, Game: item.Game))
         .ToList();
-
+ 
     var results = new List<object>();
     foreach (var (setId, game) in setsToSync)
     {
@@ -353,17 +353,17 @@ app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
             results.Add(new { setId, game, success = false, error = ex.Message });
         }
     }
-
+ 
     var syncedIdsAfter = GetSyncedIds();
     int remaining = allCatalogItems.Count(item => !syncedIdsAfter.Contains(item.SetID));
-
+ 
     return Results.Ok(new { synced = results, remainingSets = remaining });
 });
-
+ 
 app.MapPost("/api/sync/{setId}", async (string setId, string clientId) => {
     bool needsLiveCall = !ApiSync.SetAlreadySynced(setId);
     bool acquiredSlot = false;
-
+ 
     if (needsLiveCall)
     {
         var limit = SyncLimiter.CheckAndIncrement(clientId);
@@ -374,7 +374,7 @@ app.MapPost("/api/sync/{setId}", async (string setId, string clientId) => {
                 message = $"Sync limit reached. Resets at {limit.ResetsAt:g} UTC.",
                 resetsAt = limit.ResetsAt
             }, statusCode: 429);
-
+ 
         acquiredSlot = ConcurrencyLimiter.TryEnter(clientId);
         if (!acquiredSlot)
             return Results.Json(new {
@@ -383,7 +383,7 @@ app.MapPost("/api/sync/{setId}", async (string setId, string clientId) => {
                 message = "You already have 2 syncs in progress. Please wait for one to finish."
             }, statusCode: 429);
     }
-
+ 
     try
     {
         bool hasCards = await ApiSync.SyncPokemonSet(setId);
@@ -397,11 +397,11 @@ app.MapPost("/api/sync/{setId}", async (string setId, string clientId) => {
         if (acquiredSlot) ConcurrencyLimiter.Exit(clientId);
     }
 });
-
+ 
 app.MapPost("/api/sync/onepiece/{setId}", async (string setId, string clientId) => {
     bool needsLiveCall = !ApiSync.SetAlreadySynced(setId);
     bool acquiredSlot = false;
-
+ 
     if (needsLiveCall)
     {
         var limit = SyncLimiter.CheckAndIncrement(clientId);
@@ -412,7 +412,7 @@ app.MapPost("/api/sync/onepiece/{setId}", async (string setId, string clientId) 
                 message = $"Sync limit reached. Resets at {limit.ResetsAt:g} UTC.",
                 resetsAt = limit.ResetsAt
             }, statusCode: 429);
-
+ 
         acquiredSlot = ConcurrencyLimiter.TryEnter(clientId);
         if (!acquiredSlot)
             return Results.Json(new {
@@ -421,7 +421,7 @@ app.MapPost("/api/sync/onepiece/{setId}", async (string setId, string clientId) 
                 message = "You already have 2 syncs in progress. Please wait for one to finish."
             }, statusCode: 429);
     }
-
+ 
     try
     {
         bool hasCards = await ApiSync.SyncOnePieceSet(setId);
@@ -435,11 +435,11 @@ app.MapPost("/api/sync/onepiece/{setId}", async (string setId, string clientId) 
         if (acquiredSlot) ConcurrencyLimiter.Exit(clientId);
     }
 });
-
+ 
 app.MapPost("/api/sync/yugioh/{setId}", async (string setId, string clientId) => {
     bool needsLiveCall = !ApiSync.SetAlreadySynced(setId);
     bool acquiredSlot = false;
-
+ 
     if (needsLiveCall)
     {
         var limit = SyncLimiter.CheckAndIncrement(clientId);
@@ -450,7 +450,7 @@ app.MapPost("/api/sync/yugioh/{setId}", async (string setId, string clientId) =>
                 message = $"Sync limit reached. Resets at {limit.ResetsAt:g} UTC.",
                 resetsAt = limit.ResetsAt
             }, statusCode: 429);
-
+ 
         acquiredSlot = ConcurrencyLimiter.TryEnter(clientId);
         if (!acquiredSlot)
             return Results.Json(new {
@@ -459,7 +459,7 @@ app.MapPost("/api/sync/yugioh/{setId}", async (string setId, string clientId) =>
                 message = "You already have 2 syncs in progress. Please wait for one to finish."
             }, statusCode: 429);
     }
-
+ 
     try
     {
         bool hasCards = await ApiSync.SyncYuGiOhSet(setId);
@@ -473,48 +473,48 @@ app.MapPost("/api/sync/yugioh/{setId}", async (string setId, string clientId) =>
         if (acquiredSlot) ConcurrencyLimiter.Exit(clientId);
     }
 });
-
+ 
 app.MapGet("/api/sync-status", (string clientId) => {
     var status = SyncLimiter.GetStatus(clientId);
     return Results.Ok(new { remaining = status.RemainingToday, resetsAt = status.ResetsAt });
 });
-
+ 
 app.MapGet("/api/sets/yugioh", async () => {
     var results = await dynamoContext.QueryAsync<DynamoSetItem>("Yu-Gi-Oh").GetRemainingAsync();
     var sets = results
         .OrderBy(s => s.SortOrder)
         .Select(s => new { setID = s.SetID, name = s.Name });
-
+ 
     return Results.Ok(sets);
 });
-
+ 
 app.MapGet("/api/trackers", (string clientId) => {
     var trackers = TrackerStore.GetTrackers(clientId);
     return Results.Ok(trackers);
 });
-
+ 
 app.MapPost("/api/trackers", (TrackerRequest req) => {
     TrackerStore.AddTracker(req.ClientId, req.SetId, req.Name, req.Game);
     return Results.Ok(new { message = "Tracker saved" });
 });
-
+ 
 app.MapDelete("/api/trackers/{setId}", (string setId, string clientId) => {
     TrackerStore.RemoveTracker(clientId, setId);
     return Results.Ok(new { message = "Tracker removed" });
 });
-
+ 
 app.MapPut("/api/trackers/reorder", (ReorderRequest req) => {
     TrackerStore.ReorderTrackers(req.ClientId, req.OrderedSetIds);
     return Results.Ok(new { message = "Order saved" });
 });
-
+ 
 Database.Initialize();
-
+ 
 // Render (and most hosts) assign a port via PORT — 0.0.0.0 accepts
 // connections from outside the container, unlike localhost.
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 app.Run($"http://0.0.0.0:{port}");
-
+ 
 // Mirrors the SetCatalog table's shape — Game is the partition key so all
 // sets for one TCG live together, SetID is the sort key identifying each
 // one within that game.
@@ -523,10 +523,32 @@ public class DynamoSetItem
 {
     [DynamoDBHashKey("Game")]
     public string Game { get; set; } = "";
-
+ 
     [DynamoDBRangeKey("SetID")]
     public string SetID { get; set; } = "";
-
+ 
     public string Name { get; set; } = "";
     public int SortOrder { get; set; }
+}
+ 
+// Pokemon/One Piece card data (NOT Yu-Gi-Oh — its images still need a
+// separate resolution before it can join this migration). SetID as the
+// partition key means "all cards in this set" is a fast, single-partition
+// query — the exact access pattern the app actually needs. CardID
+// "__EMPTY__" is a reserved sentinel meaning "this set was checked and
+// confirmed to have zero real cards" — distinct from "never checked at
+// all", mirroring what total = 0 meant in the old SQLite Sets table.
+[DynamoDBTable("TCGRiderCards")]
+public class DynamoCardItem
+{
+    [DynamoDBHashKey("SetID")]
+    public string SetID { get; set; } = "";
+ 
+    [DynamoDBRangeKey("CardID")]
+    public string CardID { get; set; } = "";
+ 
+    public string Name { get; set; } = "";
+    public string Number { get; set; } = "";
+    public string ImageUrl { get; set; } = "";
+    public string Rarity { get; set; } = "";
 }
