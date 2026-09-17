@@ -131,7 +131,7 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
     try
     {
         var seriesList = await setsHttpClient.GetFromJsonAsync<List<TcgdexSeriesBrief>>(
-            "https://api.tcgdex.net/v2/en/series"
+            "https://api.eu1.tcgdex.net/v2/en/series"
         );
 
         if (seriesList != null)
@@ -140,7 +140,7 @@ app.MapPost("/api/admin/seed-dynamodb-catalog", async () => {
                 try
                 {
                     return await setsHttpClient.GetFromJsonAsync<TcgdexSeriesFull>(
-                        $"https://api.tcgdex.net/v2/en/series/{s.Id}"
+                        $"https://api.eu1.tcgdex.net/v2/en/series/{s.Id}"
                     );
                 }
                 catch { return null; }
@@ -360,28 +360,123 @@ app.MapPost("/api/admin/bulk-sync-cards", async (int? batchSize) => {
     return Results.Ok(new { synced = results, remainingSets = remaining });
 });
 
-app.MapPost("/api/sync/{setId}", async (string setId) => {
-    bool hasCards = await ApiSync.SyncPokemonSet(setId);
-    return Results.Ok(new {
-        hasCards,
-        message = hasCards ? $"Set {setId} ready" : $"Set {setId} has no card data available"
-    });
+app.MapPost("/api/sync/{setId}", async (string setId, string clientId) => {
+    bool needsLiveCall = !ApiSync.SetAlreadySynced(setId);
+    bool acquiredSlot = false;
+
+    if (needsLiveCall)
+    {
+        var limit = SyncLimiter.CheckAndIncrement(clientId);
+        if (!limit.Allowed)
+            return Results.Json(new {
+                hasCards = false,
+                limitReached = true,
+                message = $"Sync limit reached. Resets at {limit.ResetsAt:g} UTC.",
+                resetsAt = limit.ResetsAt
+            }, statusCode: 429);
+
+        acquiredSlot = ConcurrencyLimiter.TryEnter(clientId);
+        if (!acquiredSlot)
+            return Results.Json(new {
+                hasCards = false,
+                tooManyConcurrent = true,
+                message = "You already have 2 syncs in progress. Please wait for one to finish."
+            }, statusCode: 429);
+    }
+
+    try
+    {
+        bool hasCards = await ApiSync.SyncPokemonSet(setId);
+        return Results.Ok(new {
+            hasCards,
+            message = hasCards ? $"Set {setId} ready" : $"Set {setId} has no card data available"
+        });
+    }
+    finally
+    {
+        if (acquiredSlot) ConcurrencyLimiter.Exit(clientId);
+    }
 });
 
-app.MapPost("/api/sync/onepiece/{setId}", async (string setId) => {
-    bool hasCards = await ApiSync.SyncOnePieceSet(setId);
-    return Results.Ok(new {
-        hasCards,
-        message = hasCards ? $"Synced One Piece set {setId}" : $"Set {setId} has no card data available"
-    });
+app.MapPost("/api/sync/onepiece/{setId}", async (string setId, string clientId) => {
+    bool needsLiveCall = !ApiSync.SetAlreadySynced(setId);
+    bool acquiredSlot = false;
+
+    if (needsLiveCall)
+    {
+        var limit = SyncLimiter.CheckAndIncrement(clientId);
+        if (!limit.Allowed)
+            return Results.Json(new {
+                hasCards = false,
+                limitReached = true,
+                message = $"Sync limit reached. Resets at {limit.ResetsAt:g} UTC.",
+                resetsAt = limit.ResetsAt
+            }, statusCode: 429);
+
+        acquiredSlot = ConcurrencyLimiter.TryEnter(clientId);
+        if (!acquiredSlot)
+            return Results.Json(new {
+                hasCards = false,
+                tooManyConcurrent = true,
+                message = "You already have 2 syncs in progress. Please wait for one to finish."
+            }, statusCode: 429);
+    }
+
+    try
+    {
+        bool hasCards = await ApiSync.SyncOnePieceSet(setId);
+        return Results.Ok(new {
+            hasCards,
+            message = hasCards ? $"Synced One Piece set {setId}" : $"Set {setId} has no card data available"
+        });
+    }
+    finally
+    {
+        if (acquiredSlot) ConcurrencyLimiter.Exit(clientId);
+    }
 });
 
-app.MapPost("/api/sync/yugioh/{setId}", async (string setId) => {
-    bool hasCards = await ApiSync.SyncYuGiOhSet(setId);
-    return Results.Ok(new {
-        hasCards,
-        message = hasCards ? $"Synced Yu-Gi-Oh set {setId}" : $"Set {setId} has no card data available"
-    });
+app.MapPost("/api/sync/yugioh/{setId}", async (string setId, string clientId) => {
+    bool needsLiveCall = !ApiSync.SetAlreadySynced(setId);
+    bool acquiredSlot = false;
+
+    if (needsLiveCall)
+    {
+        var limit = SyncLimiter.CheckAndIncrement(clientId);
+        if (!limit.Allowed)
+            return Results.Json(new {
+                hasCards = false,
+                limitReached = true,
+                message = $"Sync limit reached. Resets at {limit.ResetsAt:g} UTC.",
+                resetsAt = limit.ResetsAt
+            }, statusCode: 429);
+
+        acquiredSlot = ConcurrencyLimiter.TryEnter(clientId);
+        if (!acquiredSlot)
+            return Results.Json(new {
+                hasCards = false,
+                tooManyConcurrent = true,
+                message = "You already have 2 syncs in progress. Please wait for one to finish."
+            }, statusCode: 429);
+    }
+
+    try
+    {
+        bool hasCards = await ApiSync.SyncYuGiOhSet(setId);
+        return Results.Ok(new {
+            hasCards,
+            message = hasCards ? $"Synced Yu-Gi-Oh set {setId}" : $"Set {setId} has no card data available"
+        });
+    }
+    finally
+    {
+        if (acquiredSlot) ConcurrencyLimiter.Exit(clientId);
+    }
+});
+
+app.MapGet("/api/sync-status", (string clientId) => {
+    var status = SyncLimiter.GetStatus(clientId);
+    return Results.Ok(new { remaining = status.RemainingToday, resetsAt = status.ResetsAt });
 });
 
 app.MapGet("/api/sets/yugioh", async () => {
