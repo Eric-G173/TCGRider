@@ -1,14 +1,14 @@
 using Microsoft.Data.Sqlite;
-
+ 
 public class Database
 {
     private const string ConnectionString = "Data Source=tcgrider.db";
-
+ 
     public static void Initialize()
     {
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
-
+ 
         var command = connection.CreateCommand();
         command.CommandText = @"
             CREATE TABLE IF NOT EXISTS Sets (
@@ -18,7 +18,7 @@ public class Database
                 logo_url TEXT,
                 last_synced TEXT
             );
-
+ 
             CREATE TABLE IF NOT EXISTS Cards (
                 id TEXT PRIMARY KEY,
                 set_id TEXT NOT NULL,
@@ -28,7 +28,7 @@ public class Database
                 rarity TEXT,
                 FOREIGN KEY (set_id) REFERENCES Sets(id)
             );
-
+ 
             CREATE TABLE IF NOT EXISTS UserTrackers (
                 client_id TEXT NOT NULL,
                 set_id TEXT NOT NULL,
@@ -37,7 +37,17 @@ public class Database
                 position INTEGER NOT NULL,
                 PRIMARY KEY (client_id, set_id)
             );
-
+ 
+            -- Tracks each client's rolling 24-hour sync window. window_start
+            -- is set the moment a client's FIRST sync in a new window
+            -- happens, not at midnight — the window resets exactly 24
+            -- hours after that first sync, not on a calendar-day boundary.
+            CREATE TABLE IF NOT EXISTS SyncLimitTracker (
+                client_id TEXT PRIMARY KEY,
+                window_start TEXT NOT NULL,
+                sync_count INTEGER NOT NULL
+            );
+ 
             -- Collection previously had no client_id, meaning every visitor
             -- to the shared web deployment would collide on the same rows.
             -- Safe to drop and recreate: this table has never actually been
@@ -55,7 +65,7 @@ public class Database
         command.ExecuteNonQuery();
         Console.WriteLine("Database initialized successfully");
     }
-
+ 
     public static SqliteConnection GetConnection()
     {
         var connection = new SqliteConnection(ConnectionString);

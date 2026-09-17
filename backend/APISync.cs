@@ -22,7 +22,7 @@ public class ApiSync
     // if the set's already in the DB with real cards, there's no reason to
     // hit the API. A set with total = 0 is treated as NOT synced, so a
     // manual retry is still possible if upstream data ever gets fixed.
-    private static bool SetAlreadySynced(string setId)
+    public static bool SetAlreadySynced(string setId)
     {
         using var connection = Database.GetConnection();
         var command = connection.CreateCommand();
