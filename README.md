@@ -28,9 +28,9 @@ https://github.com/user-attachments/assets/8553a56a-622b-45ff-bf0d-a6602ed41456
 
 
 # Tech stack
-- **Backend:** C# (ASP.NET Core, Minimal APIs), SQLite
+- **Backend:** C# (ASP.NET Core, SQLite, AWS Dynamo
 - **Frontend:** React, Electron
-- **APIs:** TCGdex (Pokémon set and card data)
+- **APIs:** TCGdex (Pokémon set and card data), 
 # Architecture: why data is synced locally instead of queried live
 
 Card lists, rarities, and images don't change often, so hitting the TCGdex API on every request to browse a set would be slow and add an unnecessary external dependency.
