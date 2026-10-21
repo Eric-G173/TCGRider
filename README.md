@@ -30,7 +30,8 @@ https://github.com/user-attachments/assets/8553a56a-622b-45ff-bf0d-a6602ed41456
 # Tech stack
 - **Backend:** C# (ASP.NET Core, Minimal APIs), SQLite
 - **Frontend:** React, Electron
-- **APIs:** TCGdex (Pokémon set and card data)
+- **APIs:** TCGdex (Pokémon set and card data), OPTCG (One Piece set and card data), YGOPRODeck (Yu-gi-oh set and card data)
+- **Testing/Quality:** Playwright, xUnit, pytest, CodeQL, Dependabot
 # Architecture: why data is synced locally instead of queried live
 
 Card lists, rarities, and images don't change often, so hitting the TCGdex API on every request to browse a set would be slow and add an unnecessary external dependency.
