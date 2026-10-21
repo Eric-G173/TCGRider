@@ -47,8 +47,8 @@ This makes browsing near-instant after the first sync, and means previously-sync
 
 ### Backend
 ```
-git clone https://github.com/Eric-G173/PROJECT-MIDNIGHT-RIDER.git
-cd PROJECT-MIDNIGHT-RIDER/backend
+git clone https://github.com/Eric-G173/TCGRider.git
+cd TCGRider/backend
 dotnet restore
 ```
 Then run:
