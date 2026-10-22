@@ -1,10 +1,236 @@
-.tracker-empty {
-  /* Shown when no tracker is selected OR cards are loading
-     height: 100% + flex centering puts the message in the dead center of the content area */
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap');
+
+.hero {
+  --ink: #f6f3ff;
+  --midnight: #12163b;
+  --tile-w: 132px;
+  --tile-gap: 14px;
+
+  position: relative;
   display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 560px;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--midnight);
+  color: var(--ink);
+  font-family: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+}
+
+/* Per-game colors, shared by the wall tiles and the link cards. */
+.pokemon  { --c1: #ffe27a; --c2: #e8a317; --on: #2b2100; }
+.onepiece { --c1: #f06a70; --c2: #a62a35; --on: #ffffff; }
+.yugioh   { --c1: #9a72ea; --c2: #4a2594; --on: #ffffff; }
+
+/* ---------- Scrolling card wall ---------- */
+
+.wall {
+  position: absolute;
+  top: 50%;
+  left: -15%;
+  right: -15%;
+  z-index: -2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tile-gap);
+  transform: translateY(-50%) rotate(-7deg);
+  pointer-events: none;
+}
+
+.row {
+  display: flex;
+  width: max-content;
+  flex-shrink: 0;
+  animation: drift linear infinite;
+  will-change: transform;
+}
+
+.reverse {
+  animation-direction: reverse;
+}
+
+@keyframes drift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--tile-w);
+  aspect-ratio: 5 / 7;
+  margin-right: var(--tile-gap); /* margin, not gap, so both halves match exactly */
+  border-radius: 9px;
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--c1), var(--c2));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* Decorative card back: inner frame plus a foil sheen. */
+.tile::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 5px;
+}
+
+.tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.28) 50%, transparent 62%);
+}
+
+.tile-art::before {
+  display: none;
+}
+
+.tile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Dims the wall behind the text, lighter toward the edges. */
+.shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 50%,
+    rgba(18, 22, 59, 0.92) 0%,
+    rgba(18, 22, 59, 0.72) 55%,
+    rgba(18, 22, 59, 0.35) 100%
+  );
+}
+
+/* ---------- Foreground ---------- */
+
+.content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  color: var(--app-white);
-  font-size: 14px;
+  gap: 1.1rem;
+  padding: 2.5rem 1.5rem 2rem;
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  max-width: 16ch;
+  font-size: clamp(2.2rem, 5.4vw, 4.2rem);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  text-shadow: 0 2px 28px rgba(10, 12, 40, 0.85);
+}
+
+.sub {
+  margin: 0;
+  max-width: 38ch;
+  font-size: 1.15rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: rgba(246, 243, 255, 0.9);
+  text-shadow: 0 1px 14px rgba(10, 12, 40, 0.8);
+}
+
+.games {
+  display: flex;
+  justify-content: center;
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+  margin-top: 0.75rem;
+}
+
+.games > :nth-child(1) { --tilt: -4deg; }
+.games > :nth-child(2) { --tilt: 0deg; }
+.games > :nth-child(3) { --tilt: 4deg; }
+
+/* The links are cards themselves, echoing the wall. */
+.game-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  width: clamp(104px, 15vw, 150px);
+  aspect-ratio: 5 / 7;
+  padding: 0.9rem;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(160deg, var(--c1), var(--c2));
+  color: var(--on);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 255, 255, 0.92),
+    0 14px 30px rgba(0, 0, 0, 0.45);
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 0.18s ease;
+}
+
+.game-btn:hover:not(:disabled),
+.game-btn:focus-visible {
+  transform: translateY(-8px) rotate(0deg);
+}
+
+.game-btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+}
+
+.game-btn:disabled {
+  cursor: progress;
+  opacity: 0.8;
+}
+
+.game-name {
+  font-size: clamp(1.05rem, 2.2vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.game-note {
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.legal {
+  margin: 0.75rem 0 0;
+  max-width: 46ch;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: rgba(246, 243, 255, 0.78);
+}
+
+@media (max-width: 520px) {
+  .hero {
+    --tile-w: 96px;
+    --tile-gap: 10px;
+  }
+
+  .sub {
+    font-size: 1.05rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    animation: none;
+  }
+
+  .game-btn {
+    transition: none;
+  }
 }
