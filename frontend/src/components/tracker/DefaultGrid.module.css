@@ -18,10 +18,10 @@
   font-family: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
 }
 
-/* Per-game colors, shared by the wall tiles and the link cards. */
-.pokemon  { --c1: #ffe27a; --c2: #e8a317; --on: #2b2100; }
-.onepiece { --c1: #f06a70; --c2: #a62a35; --on: #ffffff; }
-.yugioh   { --c1: #9a72ea; --c2: #4a2594; --on: #ffffff; }
+/* Flat per-game colors, used by the card backs and the label strips. */
+.pokemon  { --c: #f2b51f; --on: #2b2100; }
+.onepiece { --c: #c9323b; --on: #ffffff; }
+.yugioh   { --c: #5b34ab; --on: #ffffff; }
 
 /* ---------- Scrolling card wall ---------- */
 
@@ -63,24 +63,16 @@
   margin-right: var(--tile-gap); /* margin, not gap, so both halves match exactly */
   border-radius: 9px;
   overflow: hidden;
-  background: linear-gradient(150deg, var(--c1), var(--c2));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  background: var(--c);
 }
 
-/* Decorative card back: inner frame plus a foil sheen. */
+/* Plain card back, only seen if an image is missing. */
 .tile::before {
   content: '';
   position: absolute;
   inset: 7px;
   border: 2px solid rgba(255, 255, 255, 0.55);
   border-radius: 5px;
-}
-
-.tile::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.28) 50%, transparent 62%);
 }
 
 .tile-art::before {
@@ -96,17 +88,12 @@
   display: block;
 }
 
-/* Dims the wall behind the text, lighter toward the edges. */
+/* Flat dim over the wall so the text is readable. */
 .shade {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(
-    ellipse 70% 60% at 50% 50%,
-    rgba(18, 22, 59, 0.92) 0%,
-    rgba(18, 22, 59, 0.72) 55%,
-    rgba(18, 22, 59, 0.35) 100%
-  );
+  background: rgba(18, 22, 59, 0.78);
 }
 
 /* ---------- Foreground ---------- */
@@ -132,7 +119,6 @@
   line-height: 1.04;
   letter-spacing: -0.01em;
   text-wrap: balance;
-  text-shadow: 0 2px 28px rgba(10, 12, 40, 0.85);
 }
 
 .sub {
@@ -141,8 +127,7 @@
   font-size: 1.15rem;
   font-weight: 400;
   line-height: 1.5;
-  color: rgba(246, 243, 255, 0.9);
-  text-shadow: 0 1px 14px rgba(10, 12, 40, 0.8);
+  color: rgba(246, 243, 255, 0.92);
 }
 
 .games {
@@ -156,25 +141,24 @@
 .games > :nth-child(2) { --tilt: 0deg; }
 .games > :nth-child(3) { --tilt: 4deg; }
 
-/* The links are cards themselves, echoing the wall. */
+/* Each link is a real card with a flat label strip along the bottom. */
 .game-btn {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  align-items: flex-start;
   width: clamp(104px, 15vw, 150px);
   aspect-ratio: 5 / 7;
-  padding: 0.9rem;
-  border: 0;
+  padding: 0;
+  border: 3px solid #fff;
   border-radius: 12px;
-  background: linear-gradient(160deg, var(--c1), var(--c2));
+  overflow: hidden;
+  background: var(--c);
   color: var(--on);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  box-shadow:
-    inset 0 0 0 4px rgba(255, 255, 255, 0.92),
-    0 14px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
   transform: rotate(var(--tilt, 0deg));
   transition: transform 0.18s ease;
 }
@@ -191,18 +175,35 @@
 
 .game-btn:disabled {
   cursor: progress;
-  opacity: 0.8;
+  opacity: 0.85;
+}
+
+.game-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.game-label {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.7rem 0.6rem;
+  background: var(--c);
 }
 
 .game-name {
-  font-size: clamp(1.05rem, 2.2vw, 1.5rem);
+  font-size: clamp(1rem, 2vw, 1.3rem);
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1.1;
 }
 
 .game-note {
-  margin-top: 0.3rem;
-  font-size: 0.8rem;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 

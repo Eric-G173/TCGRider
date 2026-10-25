@@ -1,0 +1,35 @@
+{
+  "pokemon": [
+    "pokemon-01.webp",
+    "pokemon-02.webp",
+    "pokemon-03.webp",
+    "pokemon-04.webp",
+    "pokemon-05.webp",
+    "pokemon-06.webp",
+    "pokemon-07.webp",
+    "pokemon-08.webp",
+    "pokemon-09.webp",
+    "pokemon-10.webp"
+  ],
+  "onepiece": [
+    "onepiece-01.webp",
+    "onepiece-02.webp",
+    "onepiece-03.webp",
+    "onepiece-04.webp",
+    "onepiece-05.webp",
+    "onepiece-06.webp",
+    "onepiece-07.webp"
+  ],
+  "yugioh": [
+    "yugioh-01.webp",
+    "yugioh-02.webp",
+    "yugioh-03.webp",
+    "yugioh-04.webp",
+    "yugioh-05.webp",
+    "yugioh-06.webp",
+    "yugioh-07.webp",
+    "yugioh-08.webp",
+    "yugioh-09.webp",
+    "yugioh-10.webp"
+  ]
+}
