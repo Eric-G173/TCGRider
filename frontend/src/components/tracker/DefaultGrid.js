@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './DefaultGrid.module.css';
+import heroManifest from '../../heroCards.json';
 
 // These names must match the game groups used in Home.jsx.
 const GAMES = [
@@ -8,13 +9,16 @@ const GAMES = [
   { key: 'yugioh', name: 'Yu-Gi-Oh' },
 ];
 
-// Card art for the scrolling background. Paste image URLs here (small or
-// low-res versions load fastest). Any empty list falls back to decorative
-// card backs, so the page looks fine with no images at all.
+// Card art comes from `node scripts/fetch-hero-cards.mjs`, which downloads
+// real cards into public/hero and lists them in src/heroCards.json.
+// A game with no files (or a file that fails to load) falls back to a flat
+// colored card, so the page always renders.
+const toUrls = files => (files || []).map(f => `${process.env.PUBLIC_URL || ''}/hero/${f}`);
+
 const HERO_CARDS = {
-  pokemon: [],
-  onepiece: [],
-  yugioh: [],
+  pokemon: toUrls(heroManifest.pokemon),
+  onepiece: toUrls(heroManifest.onepiece),
+  yugioh: toUrls(heroManifest.yugioh),
 };
 
 const ROWS = 6;           // raise for very tall screens
@@ -40,6 +44,8 @@ const ROW_TILES = Array.from({ length: ROWS }, (_, r) =>
   Array.from({ length: TILES_PER_ROW }, (_, i) => POOL[(r * 5 + i) % POOL.length])
 );
 
+const pickRandom = list => (list.length ? list[Math.floor(Math.random() * list.length)] : null);
+
 function CardTile({ game, src }) {
   const [failed, setFailed] = React.useState(false);
   const hasArt = Boolean(src) && !failed;
@@ -61,6 +67,14 @@ function CardTile({ game, src }) {
 }
 
 function DefaultGrid({ onSelectGame, loading = {} }) {
+  // One random real card per game for the three front cards.
+  // Chosen once per visit to this page, so it changes when you come back.
+  const [covers] = React.useState(() => ({
+    pokemon: pickRandom(HERO_CARDS.pokemon),
+    onepiece: pickRandom(HERO_CARDS.onepiece),
+    yugioh: pickRandom(HERO_CARDS.yugioh),
+  }));
+
   return (
     <section className={styles.hero} aria-labelledby="home-title">
       <div className={styles.wall} aria-hidden="true">
@@ -94,6 +108,7 @@ function DefaultGrid({ onSelectGame, loading = {} }) {
         <div className={styles.games}>
           {GAMES.map(game => {
             const isLoading = Boolean(loading[game.name]);
+            const cover = covers[game.key];
             return (
               <button
                 type="button"
@@ -103,8 +118,19 @@ function DefaultGrid({ onSelectGame, loading = {} }) {
                 disabled={isLoading}
                 onClick={() => onSelectGame && onSelectGame(game.name)}
               >
-                <span className={styles['game-name']}>{game.name}</span>
-                {isLoading && <span className={styles['game-note']}>Loading sets…</span>}
+                {cover && (
+                  <img
+                    className={styles['game-art']}
+                    src={cover}
+                    alt=""
+                    draggable="false"
+                    onError={e => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
+                <span className={styles['game-label']}>
+                  <span className={styles['game-name']}>{game.name}</span>
+                  {isLoading && <span className={styles['game-note']}>Loading sets…</span>}
+                </span>
               </button>
             );
           })}
